@@ -1,0 +1,59 @@
+name: Contrôle de syntaxe
+
+# Le poste de développement n'a ni PHP ni Jeedom : aucun `php -l` n'y est possible.
+# C'est la cause racine des dix défauts bloquants des versions 1.0.1 à 1.0.10, chacun
+# n'ayant été découvert qu'une fois installé sur la chaudière. GitHub, lui, sait
+# exécuter PHP — ce contrôle déplace donc la détection avant le déploiement.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  php:
+    name: php -l
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Jeedom 4.x tourne selon les installations sur 7.4 comme sur 8.x : une syntaxe
+        # valide sur l'une peut être refusée par l'autre.
+        php-version: ['7.4', '8.2']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer PHP ${{ matrix.php-version }}
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          coverage: none
+
+      - name: Vérifier tous les fichiers PHP
+        run: |
+          set -e
+          find . -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
+
+  json:
+    name: Validité de info.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier la syntaxe JSON
+        run: |
+          python3 -c "import json,sys; json.load(open('plugin_info/info.json')); print('info.json : JSON valide')"
+
+      - name: Vérifier les champs obligatoires de Jeedom
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          info = json.load(open('plugin_info/info.json'))
+          requis = ['id', 'name', 'description', 'licence', 'author', 'require', 'version']
+          manquants = [c for c in requis if not str(info.get(c, '')).strip()]
+          if manquants:
+              sys.exit('Champs absents ou vides dans info.json : ' + ', '.join(manquants))
+          if info['id'] != 'okofen':
+              sys.exit("L'identifiant du plugin doit rester « okofen ».")
+          print('info.json : champs obligatoires présents, version', info['version'])
+          PY

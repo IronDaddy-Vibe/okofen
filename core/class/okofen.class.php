@@ -167,8 +167,9 @@ class okofen extends eqLogic {
             return;
         }
         try {
-            $this->syncCommands();
-            $this->refresh();
+            // Une seule lecture pour les deux opérations (voir syncCommands()).
+            $meta = $this->syncCommands();
+            $this->refresh(self::flattenMeta($meta));
         } catch (Exception $e) {
             log::add('okofen', 'error', 'Synchronisation impossible : ' . $e->getMessage());
             // On ne bloque pas l'enregistrement : l'utilisateur doit pouvoir corriger sa config.
@@ -234,6 +235,30 @@ class okofen extends eqLogic {
 
         log::add('okofen', 'info', $this->getHumanName() . ' : ' . count($found) . ' variables synchronisées depuis la chaudière.');
         $this->refreshWidget();
+
+        // Renvoyé pour que l'appelant puisse enchaîner un refresh() sans relire la
+        // chaudière : « all? » porte déjà les valeurs, en plus des métadonnées.
+        return $meta;
+    }
+
+    /**
+     * Ramène une réponse « all? » à la forme d'une réponse « all » : chaque variable
+     * n'est plus un objet de métadonnées mais sa seule valeur.
+     */
+    public static function flattenMeta($_meta) {
+        $flat = array();
+        foreach ($_meta as $component => $variables) {
+            if (!is_array($variables)) {
+                $flat[$component] = $variables;
+                continue;
+            }
+            foreach ($variables as $variable => $definition) {
+                $flat[$component][$variable] = (is_array($definition) && array_key_exists('val', $definition))
+                    ? $definition['val']
+                    : $definition;
+            }
+        }
+        return $flat;
     }
 
     /**
@@ -634,8 +659,15 @@ class okofen extends eqLogic {
     /* Rafraîchissement des valeurs                                        */
     /* ------------------------------------------------------------------ */
 
-    public function refresh() {
-        $data = $this->getApi()->read('all', false);
+    /**
+     * Met à jour toutes les valeurs.
+     *
+     * $_data permet de réutiliser une réponse déjà obtenue — celle de la
+     * synchronisation, par exemple. Avec une fenêtre de 2,6 s entre deux requêtes,
+     * éviter une lecture redondante se voit directement sur le temps de réponse.
+     */
+    public function refresh($_data = null) {
+        $data = ($_data === null) ? $this->getApi()->read('all', false) : $_data;
         $this->setConnectionState(true);
 
         foreach ($data as $component => $variables) {
@@ -714,6 +746,16 @@ class okofen extends eqLogic {
     private function updateErrors($_errors, $_all) {
         $count = isset($_all['system']['L_errors']) ? intval($_all['system']['L_errors']) : 0;
         $messages = array();
+
+        // Instrumentation : au premier défaut réel, on veut le JSON brut plutôt qu'une
+        // interprétation. C'est la méthode qui a tranché la question des accents en un
+        // seul aller-retour, là où deux hypothèses successives s'étaient révélées
+        // fausses. La documentation communautaire ne connaît pas ce format non plus,
+        // et doute même du sens exact de « system.L_errors ».
+        if (!empty($_errors)) {
+            log::add('okofen', 'info', 'Structure brute de l\'objet « error » (à documenter) : '
+                . json_encode($_errors, JSON_UNESCAPED_UNICODE));
+        }
 
         foreach ($_errors as $key => $entry) {
             if (is_string($entry)) {
@@ -1111,8 +1153,57 @@ class okofenCmd extends cmd {
 
         $eqLogic->getApi()->write($fullName, $value);
 
-        // La chaudière met un instant à refléter le changement.
-        sleep(1);
+        // La fenêtre de débit impose déjà une attente avant la requête suivante : la
+        // relecture laisse donc à la chaudière le temps de refléter le changement,
+        // sans qu'il soit besoin d'un sleep() supplémentaire.
         $eqLogic->refresh();
+        $this->verifyApplied($eqLogic, $fullName, $value);
+    }
+
+    /**
+     * Contrôle qu'une écriture a réellement été prise en compte.
+     *
+     * L'écho renvoyé par la chaudière ne prouve rien : constaté sur
+     * « pe1_storage_fill_yesterday », qui répond l'écho attendu et laisse la valeur
+     * inchangée. Seule la relecture fait foi.
+     *
+     * Un écart n'est pas nécessairement un échec : la chaudière borne les consignes
+     * hors plage. Le message dit donc ce qui a été retenu, sans conclure à sa place.
+     */
+    private function verifyApplied($_eqLogic, $_fullName, $_expected) {
+        $infoCmd = $_eqLogic->getCmd(null, $_fullName);
+        if (!is_object($infoCmd)) {
+            return;
+        }
+        $actual = $infoCmd->execCmd();
+
+        $factor = floatval($this->getConfiguration('factor', 1));
+        if ($factor == 0) {
+            $factor = 1;
+        }
+
+        if (okofenApi::isBooleanValue($_expected)) {
+            $applied = (okofenApi::boolToInt($actual) === okofenApi::boolToInt($_expected));
+            $expectedShown = okofenApi::boolToInt($_expected);
+        } elseif (is_numeric($_expected) && is_numeric($actual)) {
+            // La commande info porte la valeur mise à l'échelle, l'écriture la valeur brute.
+            $expectedShown = round(floatval($_expected) * $factor, 2);
+            $applied = (abs(floatval($actual) - $expectedShown) < 0.01);
+        } else {
+            $expectedShown = $_expected;
+            $applied = (trim((string) $actual) === trim((string) $_expected));
+        }
+
+        if ($applied) {
+            log::add('okofen', 'info', 'Écriture confirmée par relecture : ' . $_fullName . ' = ' . $actual);
+            return;
+        }
+
+        $message = __('La chaudière n\'a pas retenu la valeur demandée pour « ', __FILE__)
+            . $_fullName . __(' » : demandé ', __FILE__) . $expectedShown
+            . __(', relu ', __FILE__) . $actual
+            . __('. La valeur a pu être bornée hors plage, ou l\'écriture refusée sans le dire.', __FILE__);
+        log::add('okofen', 'warning', $message);
+        message::add('okofen', $message);
     }
 }

@@ -1,0 +1,60 @@
+name: Publier une version
+
+# Construit l'archive installable et l'attache à une Release dès qu'un tag « v* » est
+# poussé. Jusqu'ici les zips étaient reconstruits à la main à chaque correction, sans
+# trace de ce qui avait réellement été livré.
+#
+# Effet secondaire utile : Jeedom affiche le hash du commit à la place du numéro de
+# version pour un plugin installé depuis une source Git. La Release redonne un point
+# de repère lisible.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier la syntaxe avant de publier
+        run: |
+          set -e
+          find . -type f -name '*.php' -print0 | xargs -0 -r -n1 php -l
+
+      - name: Contrôler que le tag correspond à info.json
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME#v}"
+          VERSION=$(python3 -c "import json; print(json.load(open('plugin_info/info.json'))['version'])")
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "Le tag ($TAG) ne correspond pas à info.json ($VERSION)." >&2
+            exit 1
+          fi
+          echo "Tag et info.json concordent : $VERSION"
+
+      - name: Construire les archives
+        run: |
+          set -e
+          mkdir -p build/okofen
+          rsync -a --exclude '.git' --exclude '.github' --exclude 'build' ./ build/okofen/
+
+          # Deux dispositions, la version attendue par Jeedom dépendant du mode
+          # d'installation : fichiers à la racine, ou encapsulés dans un dossier.
+          (cd build/okofen && zip -rq ../../okofen.zip .)
+          (cd build && zip -rq ../okofen-dossier.zip okofen)
+
+      - name: Créer la Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          files: |
+            okofen.zip
+            okofen-dossier.zip

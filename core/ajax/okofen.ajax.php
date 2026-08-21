@@ -15,30 +15,31 @@ try {
     /* ---------------------------------------------------------------- */
     if (init('action') == 'testConnection') {
         $api = new okofenApi(init('ip'), init('port', 4321), init('password'), config::byKey('httpTimeout', 'okofen', 10));
-        $system = $api->testConnection();
+
+        // Une seule requête : « all? » contient déjà le composant « system », et la
+        // chaudière n'accepte qu'une requête toutes les 2,6 s. Lire « system » puis
+        // « all? » doublait donc le temps de réponse pour rien.
+        $all = $api->read('all', true);
+        if (!isset($all['system'])) {
+            throw new Exception(__('Réponse valide mais composant « system » absent.', __FILE__));
+        }
 
         // On enrichit le message avec le modèle réellement détecté, plus parlant
         // qu'un simple « connexion réussie ».
         $details = array();
-        try {
-            // Le suffixe « ? » (métadonnées) n'est accepté que sur « all » : sur un
-            // composant seul, la chaudière répond par sa page d'aide.
-            $pe = $api->read('all', true);
-            if (isset($pe['pe1']['L_type'])) {
-                $types = okofenApi::parseFormat($pe['pe1']['L_type']['format']);
-                $typeVal = intval($pe['pe1']['L_type']['val']);
-                if (isset($types[$typeVal])) {
-                    $details[] = __('Modèle : ', __FILE__) . $types[$typeVal];
-                }
+        if (isset($all['pe1']['L_type'])) {
+            $types = okofenApi::parseFormat($all['pe1']['L_type']['format']);
+            $typeVal = intval($all['pe1']['L_type']['val']);
+            if (isset($types[$typeVal])) {
+                $details[] = __('Modèle : ', __FILE__) . $types[$typeVal];
             }
-            if (isset($pe['pe1']['L_runtime']['val'])) {
-                $details[] = __('Compteur brûleur : ', __FILE__) . $pe['pe1']['L_runtime']['val'] . ' h';
-            }
-        } catch (Exception $e) {
-            // Non bloquant : la connexion de base est déjà validée.
         }
-        if (isset($system['system']['L_errors'])) {
-            $details[] = __('Défauts : ', __FILE__) . $system['system']['L_errors'];
+        if (isset($all['pe1']['L_runtime']['val'])) {
+            $details[] = __('Compteur brûleur : ', __FILE__) . $all['pe1']['L_runtime']['val'] . ' h';
+        }
+        if (isset($all['system']['L_errors'])) {
+            $errors = $all['system']['L_errors'];
+            $details[] = __('Défauts : ', __FILE__) . (is_array($errors) ? $errors['val'] : $errors);
         }
 
         ajax::success(__('Connexion réussie. ', __FILE__) . implode(' — ', $details));
@@ -50,8 +51,10 @@ try {
         if (!is_object($eqLogic) || $eqLogic->getEqType_name() != 'okofen') {
             throw new Exception(__('Équipement ÖkoFEN introuvable : ', __FILE__) . init('id'));
         }
-        $eqLogic->syncCommands();
-        $eqLogic->refresh();
+        // Une seule lecture de la chaudière : « all? » sert à la fois à la
+        // synchronisation et à la mise à jour des valeurs.
+        $meta = $eqLogic->syncCommands();
+        $eqLogic->refresh(okofen::flattenMeta($meta));
         ajax::success();
     }
 

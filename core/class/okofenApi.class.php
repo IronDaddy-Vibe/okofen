@@ -33,19 +33,32 @@ class okofenApi {
     const SENTINEL_NA = -32768;
 
     /**
-     * Nombre de tentatives par requête. La chaudière renvoie un 401 alors que le mot
-     * de passe est valide : sans réessai, le plugin signalerait de fausses pertes de
-     * connexion en permanence.
+     * Fenêtre minimale imposée par la chaudière entre deux requêtes, en secondes.
      *
-     * La fréquence mesurée en exploration (1 requête sur 8) s'est révélée très
-     * optimiste : en fonctionnement réel, la plupart des requêtes échouent une à deux
-     * fois, et certaines n'aboutissent qu'à la 3ᵉ tentative. La limite est donc portée
-     * à 5 pour conserver une marge.
+     * Les 401 ne sont pas « sporadiques » : c'est une LIMITATION DE DÉBIT. Deux sources
+     * indépendantes le confirment — le plugin MyOkoTouch gère « le délai minimum
+     * obligatoire de 2500 ms entre deux appels », et la bibliothèque pyokofen documente
+     * « a soft limitation of 1 request per 10 seconds ». Nos propres logs concordent :
+     * une requête refusée deux fois n'aboutit qu'environ 2,5 s après la précédente.
+     *
+     * Réessayer sans attendre revient donc à bombarder une API qui demande qu'on la
+     * laisse respirer : on finissait par réussir par accident, au bout de trois essais.
+     * Une marge est prise sur les 2500 ms annoncés.
      */
-    const MAX_ATTEMPTS = 5;
+    const MIN_INTERVAL = 2.6;
 
-    /** Pause entre deux tentatives, en microsecondes. */
-    const RETRY_DELAY_US = 800000;
+    /** Clé de cache portant l'horodatage de la dernière requête, tous processus confondus. */
+    const LAST_REQUEST_KEY = 'okofen::lastRequest';
+
+    /**
+     * Nombre de tentatives par requête. Devenu un simple filet de sécurité depuis que la
+     * fenêtre de débit est respectée : un échec signale désormais un vrai problème
+     * (chaudière éteinte, réseau coupé) et non un refus de cadence.
+     */
+    const MAX_ATTEMPTS = 3;
+
+    /** Pause avant un réessai, en microsecondes. Alignée sur la fenêtre de débit. */
+    const RETRY_DELAY_US = 2600000;
 
     private $ip;
     private $port;
@@ -61,6 +74,25 @@ class okofenApi {
 
     public function getBaseUrl() {
         return 'http://' . $this->ip . ':' . $this->port . '/' . rawurlencode($this->password) . '/';
+    }
+
+    /**
+     * Attend que la fenêtre de débit soit écoulée depuis la dernière requête, puis
+     * réserve immédiatement le créneau suivant.
+     *
+     * L'horodatage passe par le cache de Jeedom et non par une variable statique : le
+     * cron, les pages web et les appels ajax sont des processus PHP distincts, qui ne
+     * partagent aucune mémoire. Sans cela, une action lancée depuis l'interface pendant
+     * une relève automatique repartirait de zéro et se ferait refuser.
+     */
+    private static function throttle() {
+        $last = floatval(cache::byKey(self::LAST_REQUEST_KEY)->getValue(0));
+        $wait = ($last + self::MIN_INTERVAL) - microtime(true);
+        if ($wait > 0) {
+            // Borne de sécurité : une horloge qui recule ne doit pas figer le plugin.
+            usleep((int) (min($wait, self::MIN_INTERVAL) * 1000000));
+        }
+        cache::set(self::LAST_REQUEST_KEY, microtime(true));
     }
 
     /**
@@ -80,6 +112,7 @@ class okofenApi {
 
         $lastError = '';
         for ($attempt = 1; $attempt <= self::MAX_ATTEMPTS; $attempt++) {
+            self::throttle();
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -109,10 +142,15 @@ class okofenApi {
                 self::logEncodingSample($body);
                 return self::restoreAccents(self::toUtf8($body));
             } else {
-                // Piège n°5 : la chaudière renvoie sporadiquement un 401 alors que le
-                // mot de passe est valide (observé environ une requête sur huit). Ce
-                // n'est pas un refus d'authentification : la requête suivante passe.
-                // Le refus réel se manifeste par la page d'aide, traitée plus haut.
+                // Piège n°5 : un 401 avec un mot de passe valide signale un dépassement
+                // de cadence, pas un refus d'authentification — celui-ci se manifeste
+                // par la page d'aide, traitée plus haut. Depuis que la fenêtre de débit
+                // est respectée, ce cas doit être devenu rare : s'il persiste, la
+                // fenêtre est trop courte pour ce modèle de chaudière.
+                if ($httpCode === 401) {
+                    log::add('okofen', 'debug', 'Refus 401 malgré la fenêtre de '
+                        . self::MIN_INTERVAL . ' s — cadence peut-être encore trop rapide.');
+                }
                 $lastError = __('Réponse HTTP inattendue : ', __FILE__) . $httpCode;
             }
 
