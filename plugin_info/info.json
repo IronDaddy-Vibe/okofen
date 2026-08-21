@@ -1,0 +1,20 @@
+{
+    "id": "okofen",
+    "name": "ÖkoFEN",
+    "description": "Supervision et pilotage des chaudières à granulés ÖkoFEN (Pellematic / Pelletronic Touch) via l'API JSON locale : températures, états, compteurs, défauts, commandes chauffage et ECS, stock de pellets et suivi de maintenance.",
+    "licence": "GPL",
+    "author": "thieryethan8",
+    "require": "4.4",
+    "version": "1.1.1",
+    "category": "heating",
+    "hasDependency": false,
+    "hasOwnDeamon": false,
+    "maxDependancyInstallTime": 5,
+    "documentation": "",
+    "changelog": "",
+    "language": ["fr_FR"],
+    "eventjs": false,
+    "display": {
+        "panel": false
+    }
+}

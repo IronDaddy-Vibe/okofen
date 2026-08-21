@@ -1,0 +1,5 @@
+# Le plugin est déployé sur un Jeedom Linux et le zip est construit depuis la copie
+# de travail : les fins de ligne restent en LF, quelle que soit la plateforme.
+* text=auto eol=lf
+
+*.png binary
