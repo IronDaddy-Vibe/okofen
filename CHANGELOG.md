@@ -1,5 +1,26 @@
 # Journal des versions
 
+## 1.4.4 — 22/08/2026
+
+### Documentation utilisateur remise à jour
+
+`docs/fr_FR/index.md` datait de la 1.0.0 et contenait des affirmations **devenues
+fausses** — d'autant plus gênant que `info.json` pointe dessus depuis la 1.2.0 : le
+bouton « Documentation » de Jeedom affichait donc une doc en retard de quatre versions.
+
+Corrigé :
+
+- L'encodage n'est **pas** de l'ISO-8859-1 : la chaudière n'émet que de l'ASCII et
+  détruit les accents à la source.
+- Les 401 ne sont **pas** une anomalie sporadique « d'une requête sur huit » : c'est une
+  **limitation de cadence**, globale à la chaudière et non propre à un client.
+- Les écritures sont désormais vérifiées par relecture, ce que la doc ignorait.
+
+Ajouté : installation depuis GitHub ou par fichier, modes d'affichage Basique/Expert,
+widget de tableau de bord et ses contrôles, comment saisir une quantité selon le point
+d'appel, deux particularités d'API non documentées (suffixe `?` réservé à `all`,
+variables impulsion), et cinq entrées de dépannage.
+
 ## 1.4.3 — 22/08/2026
 
 ### Les boutons du widget fonctionnent enfin
