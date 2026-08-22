@@ -8,11 +8,9 @@
   --ok-ink: #E7F0E7;
   --ok-muted: #8FA391;
   --ok-green: #8CC63F;
-  --ok-green-soft: #A6D95F;
   --ok-blue: #3FA3DB;
   --ok-red: #E8543C;
   --ok-orange: #F0A030;
-  --ok-pellet: #C89A5B;
   font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   background: var(--ok-bg);
   color: var(--ok-ink);
@@ -37,7 +35,7 @@
 
 .okofen-widget .ok-grid {
   display: grid; gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(225px, 1fr));
 }
 .okofen-widget .ok-panel {
   background: var(--ok-panel); border: 1px solid var(--ok-line); border-radius: 8px;
@@ -53,7 +51,7 @@
 .okofen-widget .ok-row {
   display: flex; align-items: center; gap: 10px;
   padding: 7px 0; border-bottom: 1px solid var(--ok-line);
-  font-size: 0.82rem;
+  font-size: 0.82rem; min-height: 34px;
 }
 .okofen-widget .ok-row:last-child { border-bottom: none; }
 .okofen-widget .ok-row .lbl { color: var(--ok-ink); opacity: 0.88; }
@@ -65,6 +63,40 @@
 .okofen-widget .v-orange { color: var(--ok-orange); }
 .okofen-widget .v-mute   { color: var(--ok-muted); }
 
+/* --- contrôles --------------------------------------------------------- */
+.okofen-widget .ok-btns {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  padding: 9px 12px 11px; border-top: 1px solid var(--ok-line);
+}
+.okofen-widget .ok-btn {
+  flex: 1 1 auto; min-width: 58px;
+  font: inherit; font-size: 0.72rem; font-weight: 600;
+  color: var(--ok-muted); background: #0E140F;
+  border: 1px solid var(--ok-line); border-radius: 5px;
+  padding: 5px 8px; cursor: pointer; text-align: center;
+  transition: border-color .12s, color .12s;
+}
+.okofen-widget .ok-btn:hover { color: var(--ok-ink); border-color: #3C5236; }
+.okofen-widget .ok-btn:focus-visible { outline: 2px solid var(--ok-green); outline-offset: 2px; }
+.okofen-widget .ok-btn.active {
+  color: #0B0F0C; background: var(--ok-green); border-color: var(--ok-green);
+}
+.okofen-widget .ok-btn.accent { color: var(--ok-orange); border-color: #4A3A17; }
+.okofen-widget .ok-btn.accent:hover { color: #FFC163; border-color: var(--ok-orange); }
+
+.okofen-widget .ok-step { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.okofen-widget .ok-step .val { margin-left: 0; min-width: 62px; text-align: right; }
+.okofen-widget .ok-pm {
+  font: inherit; font-size: 0.9rem; line-height: 1;
+  width: 24px; height: 24px; flex: none;
+  color: var(--ok-ink); background: #0E140F;
+  border: 1px solid var(--ok-line); border-radius: 5px;
+  cursor: pointer; padding: 0;
+}
+.okofen-widget .ok-pm:hover { border-color: var(--ok-green); color: var(--ok-green); }
+.okofen-widget .ok-pm:focus-visible { outline: 2px solid var(--ok-green); outline-offset: 2px; }
+.okofen-widget .ok-pm[disabled] { opacity: 0.3; cursor: default; }
+
 .okofen-widget .ok-center {
   flex: 1; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 8px; padding: 14px 12px 16px; text-align: center;
@@ -73,7 +105,7 @@
 .okofen-widget .ok-caption strong { display: block; font-size: 0.92rem; margin-bottom: 2px; }
 
 .okofen-widget .ok-split { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.okofen-widget .ok-split > .ok-rows { flex: 1 1 130px; padding-bottom: 4px; }
+.okofen-widget .ok-split > .ok-rows { flex: 1 1 150px; padding-bottom: 4px; }
 
 .okofen-widget .ok-silo { display: flex; align-items: center; gap: 14px; padding: 12px; }
 .okofen-widget .ok-silo-figures { flex: 1; display: flex; flex-direction: column; gap: 8px; text-align: center; }
@@ -83,9 +115,13 @@
 
 .okofen-widget .ok-foot {
   margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ok-line);
-  display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 0.74rem; color: var(--ok-muted);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px;
+  font-size: 0.74rem; color: var(--ok-muted);
 }
 .okofen-widget .ok-foot b { font-weight: 600; color: var(--ok-ink); opacity: 0.85; }
+.okofen-widget .ok-foot .ok-btns {
+  margin-left: auto; padding: 0; border-top: none; flex: 0 0 auto;
+}
 </style>
 
   <div class="ok-head">
@@ -111,6 +147,7 @@
         </svg>
         <div class="ok-caption"><strong style="color:#state_color#">#state_text#</strong>Modulation #modulation# %</div>
       </div>
+      #pe_mode_buttons#
     </div>
 
     <div class="ok-panel">
@@ -126,20 +163,21 @@
     <div class="ok-panel">
       <h4>Circuit chauffage</h4>
       <div class="ok-rows">
-        <div class="ok-row"><span class="ok-ico">🏠</span><span class="lbl">Confort</span><span class="val v-red">#hk_comfort#</span></div>
-        <div class="ok-row"><span class="ok-ico">🌙</span><span class="lbl">Réduit</span><span class="val v-blue">#hk_setback#</span></div>
+        <div class="ok-row"><span class="ok-ico">🏠</span><span class="lbl">Confort</span>#hk_comfort_ctl#</div>
+        <div class="ok-row"><span class="ok-ico">🌙</span><span class="lbl">Réduit</span>#hk_setback_ctl#</div>
         <div class="ok-row"><span class="ok-ico">🌡️</span><span class="lbl">Départ</span><span class="val v-green">#hk_flow#</span></div>
         <div class="ok-row"><span class="ok-ico">🔄</span><span class="lbl">Pompe</span><span class="val #hk_pump_class#">#hk_pump#</span></div>
       </div>
+      #hk_mode_buttons#
     </div>
 
     <div class="ok-panel">
       <h4>Eau chaude sanitaire</h4>
       <div class="ok-split">
         <div class="ok-rows">
-          <div class="ok-row"><span class="ok-ico">⚙️</span><span class="lbl">Mode</span><span class="val v-mute">#ww_mode#</span></div>
-          <div class="ok-row"><span class="ok-ico">🎯</span><span class="lbl">Consigne</span><span class="val v-blue">#ww_set#</span></div>
-          <div class="ok-row"><span class="ok-ico">🔥</span><span class="lbl">Minimum</span><span class="val v-orange">#ww_min#</span></div>
+          <div class="ok-row"><span class="ok-ico">🎯</span><span class="lbl">Consigne</span>#ww_set_ctl#</div>
+          <div class="ok-row"><span class="ok-ico">🔥</span><span class="lbl">Minimum</span>#ww_min_ctl#</div>
+          <div class="ok-row"><span class="ok-ico">📈</span><span class="lbl">État</span><span class="val v-mute">#ww_state#</span></div>
         </div>
         <svg viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="Température ECS">
           <circle cx="60" cy="60" r="48" fill="none" stroke="#22301F" stroke-width="10"></circle>
@@ -152,6 +190,7 @@
                 fill="#8FA391" font-family="Segoe UI, Arial, sans-serif">°C actuelle</text>
         </svg>
       </div>
+      #ww_mode_buttons#
     </div>
 
     <div class="ok-panel">
@@ -186,6 +225,7 @@
           </div>
         </div>
       </div>
+      #silo_buttons#
     </div>
 
     <div class="ok-panel">
@@ -206,7 +246,7 @@
     <span><b>Connexion</b> #conn_text#</span>
     <span><b>API JSON</b> #api_host#</span>
     <span><b>Dernière relève</b> #updated#</span>
-    <span><b>Stock</b> #stock_source#</span>
+    #refresh_button#
   </div>
 
 </div>

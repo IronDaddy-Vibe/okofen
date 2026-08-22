@@ -1132,6 +1132,109 @@ class okofen extends eqLogic {
     }
 
     /**
+     * Rangée de boutons pour une commande à liste déroulante (les modes).
+     *
+     * Le bouton correspondant à la valeur courante est mis en évidence, ce qui évite
+     * d'avoir à afficher le mode séparément.
+     */
+    private function widgetModeButtons($_actionLogicalId, $_infoLogicalId) {
+        $cmd = $this->getCmd(null, $_actionLogicalId);
+        if (!is_object($cmd)) {
+            return '';
+        }
+        $list = $cmd->getConfiguration('listValue', '');
+        if (trim($list) === '') {
+            return '';
+        }
+        $current = $this->widgetValue($_infoLogicalId, null);
+
+        $buttons = '';
+        foreach (explode(';', $list) as $entry) {
+            $parts = explode('|', $entry, 2);
+            if (count($parts) !== 2) {
+                continue;
+            }
+            $key = trim($parts[0]);
+            $label = trim($parts[1]);
+            $active = ($current !== null && (string) $current === $key) ? ' active' : '';
+            $buttons .= '<button type="button" class="ok-btn' . $active . '"'
+                . ' onclick="jeedom.cmd.execute({id:' . intval($cmd->getId())
+                . ',options:{select:\'' . htmlspecialchars($key, ENT_QUOTES) . '\'}})">'
+                . htmlspecialchars($label) . '</button>';
+        }
+        return ($buttons === '') ? '' : '<div class="ok-btns">' . $buttons . '</div>';
+    }
+
+    /**
+     * Valeur réglable par deux boutons − et +.
+     *
+     * Les valeurs cibles sont calculées ici, au rendu, et non en JavaScript : un bloc
+     * <script> inséré dynamiquement dans un tableau de bord ne s'exécute pas de façon
+     * garantie, alors qu'un gestionnaire « onclick » fonctionne toujours. Les bornes
+     * viennent de la chaudière, via la configuration de la commande.
+     *
+     * La commande action attend la valeur en unité affichée : execute() applique
+     * l'inverse du facteur avant l'envoi.
+     */
+    private function widgetStepper($_actionLogicalId, $_infoLogicalId, $_step = 0.5, $_unit = ' °C') {
+        $current = $this->widgetNumber($_infoLogicalId);
+        $cmd = $this->getCmd(null, $_actionLogicalId);
+        $shown = ($current === null) ? '—' : number_format($current, 1, ',', ' ') . $_unit;
+
+        if (!is_object($cmd) || $current === null) {
+            // Pas de commande action, ou pas de mesure : on affiche sans prétendre régler.
+            return '<span class="val v-mute">' . $shown . '</span>';
+        }
+
+        $min = $cmd->getConfiguration('minValue', '');
+        $max = $cmd->getConfiguration('maxValue', '');
+        $down = $current - $_step;
+        $up = $current + $_step;
+        $downOff = ($min !== '' && $min !== null && $down < floatval($min));
+        $upOff = ($max !== '' && $max !== null && $up > floatval($max));
+
+        $button = function ($_target, $_symbol, $_disabled) use ($cmd) {
+            if ($_disabled) {
+                return '<button type="button" class="ok-pm" disabled>' . $_symbol . '</button>';
+            }
+            return '<button type="button" class="ok-pm"'
+                . ' onclick="jeedom.cmd.execute({id:' . intval($cmd->getId())
+                . ',options:{slider:' . number_format($_target, 1, '.', '') . '}})">'
+                . $_symbol . '</button>';
+        };
+
+        return '<span class="ok-step">'
+            . $button($down, '&minus;', $downOff)
+            . '<span class="val v-blue">' . $shown . '</span>'
+            . $button($up, '+', $upOff)
+            . '</span>';
+    }
+
+    /** Bouton déclenchant une commande action sans paramètre. */
+    private function widgetActionButton($_logicalId, $_label, $_class = '') {
+        $cmd = $this->getCmd(null, $_logicalId);
+        if (!is_object($cmd)) {
+            return '';
+        }
+        return '<button type="button" class="ok-btn ' . $_class . '"'
+            . ' onclick="jeedom.cmd.execute({id:' . intval($cmd->getId()) . '})">'
+            . htmlspecialchars($_label) . '</button>';
+    }
+
+    /** Bouton demandant une valeur à l'utilisateur avant d'exécuter la commande. */
+    private function widgetPromptButton($_logicalId, $_label, $_question) {
+        $cmd = $this->getCmd(null, $_logicalId);
+        if (!is_object($cmd)) {
+            return '';
+        }
+        $question = htmlspecialchars($_question, ENT_QUOTES);
+        return '<button type="button" class="ok-btn"'
+            . ' onclick="var v=window.prompt(\'' . $question . '\');'
+            . 'if(v){jeedom.cmd.execute({id:' . intval($cmd->getId()) . ',options:{message:v}});}">'
+            . htmlspecialchars($_label) . '</button>';
+    }
+
+    /**
      * Widget de tableau de bord.
      *
      * Toute erreur de rendu retombe sur le widget standard de Jeedom : un tableau de
@@ -1186,8 +1289,9 @@ class okofen extends eqLogic {
             $replace['#runtime#'] = ($runtime === null) ? '—' : number_format($runtime, 0, ',', ' ');
 
             // --- Circuit de chauffage ---------------------------------------
-            $replace['#hk_comfort#'] = $this->widgetTemp($hk . '_temp_heat');
-            $replace['#hk_setback#'] = $this->widgetTemp($hk . '_temp_setback');
+            $replace['#hk_comfort_ctl#'] = $this->widgetStepper('set_' . $hk . '_temp_heat', $hk . '_temp_heat');
+            $replace['#hk_setback_ctl#'] = $this->widgetStepper('set_' . $hk . '_temp_setback', $hk . '_temp_setback');
+            $replace['#hk_mode_buttons#'] = $this->widgetModeButtons('set_' . $hk . '_mode_auto', $hk . '_mode_auto');
             $replace['#hk_flow#'] = $this->widgetTemp($hk . '_L_flowtemp_act');
             $pump = $this->widgetValue($hk . '_L_pump', null);
             if ($pump === null) {
@@ -1200,9 +1304,21 @@ class okofen extends eqLogic {
             }
 
             // --- Eau chaude sanitaire ---------------------------------------
-            $replace['#ww_mode#'] = $this->widgetValue($ww . '_mode_auto');
-            $replace['#ww_set#'] = $this->widgetTemp($ww . '_temp_max_set');
-            $replace['#ww_min#'] = $this->widgetTemp($ww . '_temp_min_set');
+            $replace['#ww_set_ctl#'] = $this->widgetStepper('set_' . $ww . '_temp_max_set', $ww . '_temp_max_set');
+            $replace['#ww_min_ctl#'] = $this->widgetStepper('set_' . $ww . '_temp_min_set', $ww . '_temp_min_set');
+            $replace['#ww_state#'] = $this->widgetValue($ww . '_L_statetext');
+
+            // Les modes ECS, plus le bouton de chauffe ponctuelle : « heat_once » est un
+            // booléen, il a donc deux commandes action distinctes (_on et _off).
+            $wwButtons = $this->widgetModeButtons('set_' . $ww . '_mode_auto', $ww . '_mode_auto');
+            $heatOnce = $this->widgetActionButton('set_' . $ww . '_heat_once_on', __('Chauffe unique', __FILE__), 'accent');
+            if ($heatOnce !== '') {
+                $wwButtons = ($wwButtons === '')
+                    ? '<div class="ok-btns">' . $heatOnce . '</div>'
+                    : substr($wwButtons, 0, -6) . $heatOnce . '</div>';
+            }
+            $replace['#ww_mode_buttons#'] = $wwButtons;
+
             $wwAct = $this->widgetNumber($ww . '_L_ontemp_act');
             $replace['#ww_act_raw#'] = ($wwAct === null) ? '—' : number_format($wwAct, 1, ',', ' ');
 
@@ -1249,11 +1365,19 @@ class okofen extends eqLogic {
             $replace['#api_host#'] = $this->getConfiguration('ip', '—') . ':' . $this->getConfiguration('port', 4321);
             $lastPoll = intval($this->getCache('lastPoll', 0));
             $replace['#updated#'] = ($lastPoll > 0) ? date('H:i:s', $lastPoll) : '—';
-            $replace['#stock_source#'] = ($this->getConfiguration('stockSource', 'plugin') === 'boiler')
-                ? __('compteur chaudière', __FILE__)
-                : __('comptabilité du plugin', __FILE__);
             $replace['#now_time#'] = date('H:i');
             $replace['#now_date#'] = date('d/m/Y');
+
+            // --- Contrôles restants ------------------------------------------
+            $replace['#pe_mode_buttons#'] = $this->widgetModeButtons('set_pe1_mode', 'pe1_mode');
+
+            $silo = $this->widgetPromptButton('pellet_add_delivery', __('Remplissage', __FILE__), __('Quantité livrée, en kg ?', __FILE__))
+                . $this->widgetPromptButton('pellet_set_stock', __('Corriger', __FILE__), __('Stock réel, en kg ?', __FILE__))
+                . $this->widgetActionButton('ash_reset', __('Cendres vidées', __FILE__));
+            $replace['#silo_buttons#'] = ($silo === '') ? '' : '<div class="ok-btns">' . $silo . '</div>';
+
+            $refresh = $this->widgetActionButton('refresh', __('Rafraîchir', __FILE__));
+            $replace['#refresh_button#'] = ($refresh === '') ? '' : '<div class="ok-btns">' . $refresh . '</div>';
 
             return $this->postToHtml($_version, template_replace($replace, getTemplate('core', 'dashboard', 'okofen', 'okofen')));
         } catch (Throwable $e) {

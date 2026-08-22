@@ -1,5 +1,29 @@
 # Journal des versions
 
+## 1.4.0 — 22/08/2026
+
+### Le widget devient pilotable
+
+La 1.3.0 n'affichait que des valeurs. Le widget porte désormais les commandes :
+
+- **Modes** en rangées de boutons — chaudière, circuit de chauffage, ECS. Le bouton
+  correspondant au mode courant est mis en évidence, ce qui rend inutile son affichage
+  en ligne séparée.
+- **Consignes réglables** par boutons − et + : confort, réduit, seuils ECS. Les bornes
+  proviennent de la chaudière ; un bouton qui sortirait de la plage est désactivé.
+- **Chauffe ECS ponctuelle**, en bouton dédié.
+- **Silo** : déclarer un remplissage, corriger le stock, signaler une vidange de
+  cendrier — les deux premiers demandent la valeur avant d'agir.
+- **Rafraîchir** dans le pied de page, pour forcer une relève.
+
+Choix technique : **les valeurs cibles des boutons sont calculées en PHP au rendu**,
+pas en JavaScript. Un bloc `<script>` inséré dynamiquement dans un tableau de bord ne
+s'exécute pas de façon garantie, alors qu'un gestionnaire `onclick` fonctionne
+toujours. Le widget se re-rend à chaque relève, les cibles restent donc à jour.
+
+Une commande action absente fait disparaître son contrôle plutôt que d'afficher un
+bouton inopérant — cohérent avec la découverte automatique, où rien n'est garanti.
+
 ## 1.3.0 — 22/08/2026
 
 ### Widget de tableau de bord
