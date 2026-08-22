@@ -1,5 +1,27 @@
 # Journal des versions
 
+## 1.4.1 — 22/08/2026
+
+### Une saisie vide ne peut plus remettre le stock à zéro
+
+Défaut le plus sérieux rencontré jusqu'ici, parce qu'il **détruisait une donnée sans
+rien signaler**. `setStock('')` faisait `floatval('') = 0`, et 0 passait la validation
+`>= 0` comme une valeur parfaitement légitime : une correction de stock dont la saisie
+n'arrivait pas remettait donc le compteur à zéro, en journalisant un succès.
+
+Une saisie vide ou non numérique est désormais **refusée explicitement**, avec un
+message citant la valeur reçue. Même traitement pour la déclaration de remplissage.
+
+### La valeur saisie arrive enfin
+
+Les commandes « Déclarer un remplissage » et « Corriger le stock » ne lisaient la
+saisie que sous la clé `message`. Selon le point d'appel — widget de commande du
+tableau de bord, tuile du plugin, scénario, API — Jeedom ne l'y place pas toujours.
+Plusieurs clés sont maintenant acceptées.
+
+Les options brutes sont tracées en niveau debug, pour établir la forme réellement
+transmise plutôt que d'accumuler les hypothèses.
+
 ## 1.4.0 — 22/08/2026
 
 ### Le widget devient pilotable

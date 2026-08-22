@@ -996,9 +996,25 @@ class okofen extends eqLogic {
         log::add('okofen', 'info', $this->getHumanName() . ' : bilan quotidien, ' . round($today, 2) . ' kg consommés hier.');
     }
 
+    /**
+     * Normalise une quantité saisie par l'utilisateur.
+     *
+     * Refuse explicitement une saisie vide ou non numérique au lieu de la convertir
+     * silencieusement en zéro : `floatval('')` vaut 0, ce qui a suffi à remettre un
+     * stock à zéro sans le moindre avertissement.
+     */
+    private static function parseKg($_raw, $_label) {
+        $value = trim(str_replace(',', '.', (string) $_raw));
+        if ($value === '' || !is_numeric($value)) {
+            throw new Exception($_label . __(' : saisissez une quantité en kg. Valeur reçue : « ', __FILE__)
+                . (string) $_raw . ' ».');
+        }
+        return floatval($value);
+    }
+
     /** Déclare un remplissage de silo : ajoute la quantité au stock et date l'opération. */
     public function declareDelivery($_kg) {
-        $kg = floatval(str_replace(',', '.', $_kg));
+        $kg = self::parseKg($_kg, __('Remplissage impossible', __FILE__));
         if ($kg <= 0) {
             throw new Exception(__('Quantité de remplissage invalide : ', __FILE__) . $_kg);
         }
@@ -1027,7 +1043,7 @@ class okofen extends eqLogic {
 
     /** Force la valeur du stock, pour recaler après une pesée ou une correction. */
     public function setStock($_kg) {
-        $kg = floatval(str_replace(',', '.', $_kg));
+        $kg = self::parseKg($_kg, __('Correction de stock impossible', __FILE__));
         if ($kg < 0) {
             throw new Exception(__('Stock invalide : ', __FILE__) . $_kg);
         }
@@ -1391,6 +1407,34 @@ class okofen extends eqLogic {
 
 class okofenCmd extends cmd {
 
+    /**
+     * Récupère la valeur saisie pour une commande de type message.
+     *
+     * Jeedom ne transmet pas toujours la saisie sous la même clé selon le point
+     * d'appel — widget de commande du tableau de bord, tuile du plugin, scénario,
+     * API. Parier sur la seule clé « message » a produit deux échecs : un remplissage
+     * refusé et, plus grave, un stock remis à zéro. On accepte donc plusieurs clés.
+     *
+     * Les options brutes sont tracées en debug : c'est l'instrumentation qui a permis
+     * de trancher les diagnostics précédents plutôt que d'accumuler les hypothèses.
+     */
+    private static function optionValue($_options) {
+        log::add('okofen', 'debug', 'Options reçues : ' . json_encode($_options, JSON_UNESCAPED_UNICODE));
+
+        if (is_scalar($_options)) {
+            return trim((string) $_options);
+        }
+        if (!is_array($_options)) {
+            return '';
+        }
+        foreach (array('message', 'value', 'slider', 'title', 'select') as $key) {
+            if (isset($_options[$key]) && is_scalar($_options[$key]) && trim((string) $_options[$key]) !== '') {
+                return trim((string) $_options[$key]);
+            }
+        }
+        return '';
+    }
+
     public function execute($_options = array()) {
         if ($this->getType() !== 'action') {
             return;
@@ -1408,10 +1452,10 @@ class okofenCmd extends cmd {
                 $eqLogic->declareAshEmptied();
                 return;
             case 'pellet_add_delivery':
-                $eqLogic->declareDelivery(isset($_options['message']) ? $_options['message'] : '');
+                $eqLogic->declareDelivery(self::optionValue($_options));
                 return;
             case 'pellet_set_stock':
-                $eqLogic->setStock(isset($_options['message']) ? $_options['message'] : '');
+                $eqLogic->setStock(self::optionValue($_options));
                 return;
         }
 
@@ -1442,7 +1486,7 @@ class okofenCmd extends cmd {
                 $value = ($raw === null) ? null : intval(round($raw / $factor));
                 break;
             case 'message':
-                $value = isset($_options['message']) ? $_options['message'] : null;
+                $value = self::optionValue($_options);
                 break;
             default:
                 $value = null;
