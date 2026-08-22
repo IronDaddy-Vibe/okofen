@@ -46,6 +46,45 @@ try {
     }
 
     /* ---------------------------------------------------------------- */
+    /*
+     * Exécution d'une commande depuis le widget.
+     *
+     * Les boutons du widget passaient par jeedom.cmd.execute() en lui confiant des
+     * options : celles-ci n'arrivaient jamais côté PHP — le plugin ne recevait que
+     * le contexte utilisateur — et toute commande ayant besoin d'une valeur échouait.
+     * Seules les commandes à valeur fixe fonctionnaient.
+     *
+     * On construit donc les options ici, où l'on maîtrise les deux extrémités, en les
+     * dérivant du sous-type réel de la commande.
+     */
+    if (init('action') == 'runCmd') {
+        $cmd = cmd::byId(init('id'));
+        if (!is_object($cmd) || $cmd->getEqType() != 'okofen') {
+            throw new Exception(__('Commande ÖkoFEN introuvable : ', __FILE__) . init('id'));
+        }
+
+        $value = trim((string) init('value', ''));
+        $options = array();
+        switch ($cmd->getSubType()) {
+            case 'slider':
+                $options['slider'] = $value;
+                break;
+            case 'select':
+                $options['select'] = $value;
+                break;
+            case 'message':
+                $options['message'] = $value;
+                break;
+            // « other » ne prend aucun paramètre : bouton simple.
+        }
+
+        log::add('okofen', 'debug', 'Widget → ' . $cmd->getLogicalId()
+            . ' (' . $cmd->getSubType() . ') valeur « ' . $value . ' »');
+        $cmd->execCmd($options);
+        ajax::success();
+    }
+
+    /* ---------------------------------------------------------------- */
     if (init('action') == 'syncCommands') {
         $eqLogic = eqLogic::byId(init('id'));
         if (!is_object($eqLogic) || $eqLogic->getEqType_name() != 'okofen') {

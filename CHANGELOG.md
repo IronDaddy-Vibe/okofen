@@ -1,5 +1,29 @@
 # Journal des versions
 
+## 1.4.3 — 22/08/2026
+
+### Les boutons du widget fonctionnent enfin
+
+Diagnostic complet, établi par les traces : **toute commande ayant besoin d'une valeur
+échouait** — consignes, modes, stock, remplissage — avec systématiquement des options
+réduites au contexte utilisateur. Seules les commandes à valeur fixe passaient
+(`ww1_heat_once`, écrite et acceptée).
+
+La cause : `jeedom.cmd.execute()` ne transmettait pas les options qu'on lui confiait.
+Et comme le widget remplace la tuile entière, il avait supprimé les champs de saisie
+standard de Jeedom — ses boutons étaient devenus le seul chemin possible.
+
+Les boutons appellent désormais **le point d'entrée ajax du plugin**, celui de l'onglet
+Maintenance, éprouvé depuis la 1.0.x. Les options y sont construites côté PHP à partir
+du sous-type réel de la commande, là où les deux extrémités sont maîtrisées.
+
+### Plus de faux avertissement sur la chauffe ponctuelle
+
+`ww1_heat_once` était écrite à « true », relue à 0, et signalée comme non appliquée —
+alors que l'ordre avait bien été pris en compte. C'est une **variable impulsion** : la
+chaudière la remet à zéro aussitôt. Ces variables sont désormais exclues de la
+vérification par relecture, qui n'a pas de sens pour elles.
+
 ## 1.4.2 — 22/08/2026
 
 L'instrumentation ajoutée en 1.4.1 a livré son verdict : les options transmises ne

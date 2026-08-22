@@ -19,6 +19,14 @@ class okofen extends eqLogic {
     /* Clés de métadonnées à ignorer dans la réponse « all? ». */
     const META_INFO_SUFFIX = '_info';
 
+    /*
+     * Variables « impulsion » : la chaudière les remet à zéro dès l'ordre pris en
+     * compte. Les vérifier par relecture produirait un faux avertissement à chaque
+     * usage — constaté sur ww1_heat_once, écrit à « true » et relu à 0 alors que
+     * l'ordre avait bien été accepté.
+     */
+    const TRANSIENT_VARIABLES = array('heat_once');
+
     /* ------------------------------------------------------------------ */
     /* Mode d'affichage                                                    */
     /*                                                                     */
@@ -1156,6 +1164,38 @@ class okofen extends eqLogic {
     }
 
     /**
+     * Construit le gestionnaire « onclick » d'un bouton du widget.
+     *
+     * On appelle le point d'entrée ajax du plugin plutôt que jeedom.cmd.execute() :
+     * les options confiées à cette dernière n'arrivaient jamais côté PHP, et toute
+     * commande ayant besoin d'une valeur échouait. Ici les deux extrémités sont
+     * maîtrisées.
+     *
+     * Le code est inline, sans bloc <script> : un script inséré dynamiquement dans un
+     * tableau de bord ne s'exécute pas de façon garantie, un gestionnaire d'événement
+     * fonctionne toujours.
+     *
+     * $_prompt non nul demande la valeur à l'utilisateur avant d'envoyer.
+     */
+    private function widgetCall($_cmdId, $_value = null, $_prompt = null) {
+        if ($_prompt !== null) {
+            $before = 'var v=window.prompt(\'' . htmlspecialchars($_prompt, ENT_QUOTES) . '\');'
+                . 'if(v===null||v===\'\'){return;}';
+            $value = 'v';
+        } else {
+            $before = '';
+            $value = '\'' . htmlspecialchars((string) $_value, ENT_QUOTES) . '\'';
+        }
+
+        return $before
+            . '$.ajax({type:\'POST\',url:\'plugins/okofen/core/ajax/okofen.ajax.php\','
+            . 'data:{action:\'runCmd\',id:' . intval($_cmdId) . ',value:' . $value . '},'
+            . 'dataType:\'json\','
+            . 'success:function(d){if(d.state!=\'ok\'){alert(d.result);}},'
+            . 'error:function(r){alert(\'ÖkoFEN : \'+r.statusText);}});';
+    }
+
+    /**
      * Rangée de boutons pour une commande à liste déroulante (les modes).
      *
      * Le bouton correspondant à la valeur courante est mis en évidence, ce qui évite
@@ -1182,8 +1222,7 @@ class okofen extends eqLogic {
             $label = trim($parts[1]);
             $active = ($current !== null && (string) $current === $key) ? ' active' : '';
             $buttons .= '<button type="button" class="ok-btn' . $active . '"'
-                . ' onclick="jeedom.cmd.execute({id:' . intval($cmd->getId())
-                . ',options:{select:\'' . htmlspecialchars($key, ENT_QUOTES) . '\'}})">'
+                . ' onclick="' . $this->widgetCall($cmd->getId(), $key) . '">'
                 . htmlspecialchars($label) . '</button>';
         }
         return ($buttons === '') ? '' : '<div class="ok-btns">' . $buttons . '</div>';
@@ -1217,21 +1256,21 @@ class okofen extends eqLogic {
         $downOff = ($min !== '' && $min !== null && $down < floatval($min));
         $upOff = ($max !== '' && $max !== null && $up > floatval($max));
 
-        $button = function ($_target, $_symbol, $_disabled) use ($cmd) {
-            if ($_disabled) {
-                return '<button type="button" class="ok-pm" disabled>' . $_symbol . '</button>';
-            }
-            return '<button type="button" class="ok-pm"'
-                . ' onclick="jeedom.cmd.execute({id:' . intval($cmd->getId())
-                . ',options:{slider:' . number_format($_target, 1, '.', '') . '}})">'
-                . $_symbol . '</button>';
-        };
-
         return '<span class="ok-step">'
-            . $button($down, '&minus;', $downOff)
+            . $this->widgetStepButton($cmd->getId(), $down, '&minus;', $downOff)
             . '<span class="val v-blue">' . $shown . '</span>'
-            . $button($up, '+', $upOff)
+            . $this->widgetStepButton($cmd->getId(), $up, '+', $upOff)
             . '</span>';
+    }
+
+    /** Un bouton − ou + du réglage de consigne. */
+    private function widgetStepButton($_cmdId, $_target, $_symbol, $_disabled) {
+        if ($_disabled) {
+            return '<button type="button" class="ok-pm" disabled>' . $_symbol . '</button>';
+        }
+        return '<button type="button" class="ok-pm"'
+            . ' onclick="' . $this->widgetCall($_cmdId, number_format($_target, 1, '.', '')) . '">'
+            . $_symbol . '</button>';
     }
 
     /** Bouton déclenchant une commande action sans paramètre. */
@@ -1241,7 +1280,7 @@ class okofen extends eqLogic {
             return '';
         }
         return '<button type="button" class="ok-btn ' . $_class . '"'
-            . ' onclick="jeedom.cmd.execute({id:' . intval($cmd->getId()) . '})">'
+            . ' onclick="' . $this->widgetCall($cmd->getId()) . '">'
             . htmlspecialchars($_label) . '</button>';
     }
 
@@ -1251,15 +1290,8 @@ class okofen extends eqLogic {
         if (!is_object($cmd)) {
             return '';
         }
-        $question = htmlspecialchars($_question, ENT_QUOTES);
-        // La valeur est transmise sous plusieurs clés à la fois : la clé retenue par
-        // Jeedom dépend du point d'appel, et un aller-retour de diagnostic de plus
-        // coûterait davantage que ces quelques caractères. optionValue() prend la
-        // première clé non vide.
         return '<button type="button" class="ok-btn"'
-            . ' onclick="var v=window.prompt(\'' . $question . '\');'
-            . 'if(v!==null&&v!==\'\'){jeedom.cmd.execute({id:' . intval($cmd->getId())
-            . ',options:{message:v,value:v,title:v}});}">'
+            . ' onclick="' . $this->widgetCall($cmd->getId(), null, $_question) . '">'
             . htmlspecialchars($_label) . '</button>';
     }
 
@@ -1529,6 +1561,11 @@ class okofenCmd extends cmd {
      * hors plage. Le message dit donc ce qui a été retenu, sans conclure à sa place.
      */
     private function verifyApplied($_eqLogic, $_fullName, $_expected) {
+        if (in_array($this->getConfiguration('variable', ''), okofen::TRANSIENT_VARIABLES)) {
+            log::add('okofen', 'info', 'Ordre ponctuel envoyé : ' . $_fullName
+                . ' (variable impulsion, non vérifiable par relecture).');
+            return;
+        }
         $infoCmd = $_eqLogic->getCmd(null, $_fullName);
         if (!is_object($infoCmd)) {
             return;
