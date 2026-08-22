@@ -1,5 +1,20 @@
 # Journal des versions
 
+## 1.4.2 — 22/08/2026
+
+L'instrumentation ajoutée en 1.4.1 a livré son verdict : les options transmises ne
+contenaient que `{"user_login":…,"user_id":…}`. **Aucune valeur n'était envoyée** — la
+commande était déclenchée d'un simple clic, alors qu'une commande de type message
+n'envoie sa valeur que si celle-ci a été saisie dans son champ.
+
+Le refus était donc le bon comportement ; c'est le message qui était inutile.
+
+- **Message d'erreur actionnable** : il indique désormais où saisir la quantité, et
+  distingue une saisie absente d'une saisie non numérique (« 500 kg » au lieu de
+  « 500 »).
+- **Boutons de la tuile** : la valeur est transmise sous plusieurs clés à la fois, la
+  clé retenue par Jeedom dépendant du point d'appel.
+
 ## 1.4.1 — 22/08/2026
 
 ### Une saisie vide ne peut plus remettre le stock à zéro

@@ -1005,9 +1005,17 @@ class okofen extends eqLogic {
      */
     private static function parseKg($_raw, $_label) {
         $value = trim(str_replace(',', '.', (string) $_raw));
-        if ($value === '' || !is_numeric($value)) {
-            throw new Exception($_label . __(' : saisissez une quantité en kg. Valeur reçue : « ', __FILE__)
-                . (string) $_raw . ' ».');
+        if ($value === '') {
+            // Cas le plus courant : la commande a été déclenchée d'un simple clic. Une
+            // commande de type message n'envoie la valeur que si elle a été saisie dans
+            // son champ ; le message doit donc indiquer où taper, sinon l'utilisateur
+            // recommence indéfiniment le même geste.
+            throw new Exception($_label
+                . __(' : aucune quantité reçue. Saisissez le nombre de kilos dans le champ de la commande avant de valider, ou utilisez les boutons de la tuile et l\'onglet Maintenance.', __FILE__));
+        }
+        if (!is_numeric($value)) {
+            throw new Exception($_label . __(' : « ', __FILE__) . (string) $_raw
+                . __(' » n\'est pas un nombre. Indiquez seulement les kilos, sans unité.', __FILE__));
         }
         return floatval($value);
     }
@@ -1244,9 +1252,14 @@ class okofen extends eqLogic {
             return '';
         }
         $question = htmlspecialchars($_question, ENT_QUOTES);
+        // La valeur est transmise sous plusieurs clés à la fois : la clé retenue par
+        // Jeedom dépend du point d'appel, et un aller-retour de diagnostic de plus
+        // coûterait davantage que ces quelques caractères. optionValue() prend la
+        // première clé non vide.
         return '<button type="button" class="ok-btn"'
             . ' onclick="var v=window.prompt(\'' . $question . '\');'
-            . 'if(v){jeedom.cmd.execute({id:' . intval($cmd->getId()) . ',options:{message:v}});}">'
+            . 'if(v!==null&&v!==\'\'){jeedom.cmd.execute({id:' . intval($cmd->getId())
+            . ',options:{message:v,value:v,title:v}});}">'
             . htmlspecialchars($_label) . '</button>';
     }
 
