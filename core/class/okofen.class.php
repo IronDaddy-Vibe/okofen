@@ -1086,6 +1086,183 @@ class okofen extends eqLogic {
         $history = json_decode($this->getConfiguration('ashHistory', '[]'), true);
         return is_array($history) ? array_reverse($history) : array();
     }
+
+    /* ------------------------------------------------------------------ */
+    /* Widget de tableau de bord                                           */
+    /* ------------------------------------------------------------------ */
+
+    /** Valeur d'une commande, ou un tiret cadratin si elle n'existe pas. */
+    private function widgetValue($_logicalId, $_default = '—') {
+        $cmd = $this->getCmd(null, $_logicalId);
+        if (!is_object($cmd)) {
+            return $_default;
+        }
+        $value = $cmd->execCmd();
+        return ($value === null || $value === '') ? $_default : $value;
+    }
+
+    /** Valeur numérique d'une commande, ou null si absente ou non numérique. */
+    private function widgetNumber($_logicalId) {
+        $cmd = $this->getCmd(null, $_logicalId);
+        if (!is_object($cmd)) {
+            return null;
+        }
+        $value = $cmd->execCmd();
+        return is_numeric($value) ? floatval($value) : null;
+    }
+
+    /** Formatage d'une température, tiret cadratin si la mesure manque. */
+    private function widgetTemp($_logicalId, $_unit = ' °C') {
+        $value = $this->widgetNumber($_logicalId);
+        return ($value === null) ? '—' : number_format($value, 1, ',', ' ') . $_unit;
+    }
+
+    /**
+     * Trouve le premier composant présent d'une famille : hk1, hk2… ou ww1, ww2…
+     * La configuration matérielle n'étant jamais codée en dur, le widget doit
+     * s'adapter à une installation dont le circuit ne s'appellerait pas « hk1 ».
+     */
+    private function firstComponent($_prefix, $_max, $_probeVariable) {
+        for ($i = 1; $i <= $_max; $i++) {
+            if (is_object($this->getCmd(null, $_prefix . $i . '_' . $_probeVariable))) {
+                return $_prefix . $i;
+            }
+        }
+        return $_prefix . '1';
+    }
+
+    /**
+     * Widget de tableau de bord.
+     *
+     * Toute erreur de rendu retombe sur le widget standard de Jeedom : un tableau de
+     * bord cassé serait un prix disproportionné pour un affichage d'agrément.
+     */
+    public function toHtml($_version = 'dashboard') {
+        try {
+            $replace = $this->preToHtml($_version);
+            if (!is_array($replace)) {
+                return $replace;
+            }
+
+            $hk = $this->firstComponent('hk', 6, 'L_flowtemp_act');
+            $ww = $this->firstComponent('ww', 3, 'L_ontemp_act');
+
+            // --- État de la chaudière ---------------------------------------
+            $stateCode = $this->widgetNumber('pe1_L_state');
+            $stateText = $this->widgetValue('pe1_L_statetext', __('État inconnu', __FILE__));
+            $faultActive = (intval($this->widgetValue('error_active', 0)) === 1);
+            $connected = (intval($this->widgetValue('conn_ok', 0)) === 1);
+
+            $stateColor = '#8CC63F';
+            $stateDot = '';
+            if (!$connected) {
+                $stateColor = '#8FA391';
+                $stateDot = 'bad';
+                $stateText = __('Chaudière injoignable', __FILE__);
+            } elseif ($faultActive || ($stateCode !== null && intval($stateCode) === self::STATE_ERROR)) {
+                $stateColor = '#E8543C';
+                $stateDot = 'bad';
+            } elseif ($stateCode !== null && in_array(intval($stateCode), array(self::STATE_ASH, self::STATE_PELLETS))) {
+                // Demande de maintenance : ni une panne, ni un fonctionnement normal.
+                $stateColor = '#F0A030';
+                $stateDot = 'warn';
+            }
+
+            $replace['#state_code#'] = ($stateCode === null) ? '?' : intval($stateCode);
+            $replace['#state_text#'] = $stateText;
+            $replace['#state_color#'] = $stateColor;
+            $replace['#state_dot#'] = $stateDot;
+            // L'anneau se remplit à la modulation : un cercle plein serait décoratif,
+            // celui-ci porte une information.
+            $modulation = $this->widgetNumber('pe1_L_modulation');
+            $modulation = ($modulation === null) ? 0 : max(0, min(100, $modulation));
+            $replace['#modulation#'] = intval(round($modulation));
+            $replace['#state_offset#'] = round(326.7 * (1 - ($modulation / 100)), 1);
+
+            // --- Chaudière ---------------------------------------------------
+            $replace['#temp_act#'] = $this->widgetTemp('pe1_L_temp_act');
+            $replace['#temp_set#'] = $this->widgetTemp('pe1_L_temp_set');
+            $runtime = $this->widgetNumber('pe1_L_runtime');
+            $replace['#runtime#'] = ($runtime === null) ? '—' : number_format($runtime, 0, ',', ' ');
+
+            // --- Circuit de chauffage ---------------------------------------
+            $replace['#hk_comfort#'] = $this->widgetTemp($hk . '_temp_heat');
+            $replace['#hk_setback#'] = $this->widgetTemp($hk . '_temp_setback');
+            $replace['#hk_flow#'] = $this->widgetTemp($hk . '_L_flowtemp_act');
+            $pump = $this->widgetValue($hk . '_L_pump', null);
+            if ($pump === null) {
+                $replace['#hk_pump#'] = '—';
+                $replace['#hk_pump_class#'] = 'v-mute';
+            } else {
+                $running = (okofenApi::boolToInt($pump) === 1);
+                $replace['#hk_pump#'] = $running ? __('En marche', __FILE__) : __('Arrêt', __FILE__);
+                $replace['#hk_pump_class#'] = $running ? 'v-green' : 'v-mute';
+            }
+
+            // --- Eau chaude sanitaire ---------------------------------------
+            $replace['#ww_mode#'] = $this->widgetValue($ww . '_mode_auto');
+            $replace['#ww_set#'] = $this->widgetTemp($ww . '_temp_max_set');
+            $replace['#ww_min#'] = $this->widgetTemp($ww . '_temp_min_set');
+            $wwAct = $this->widgetNumber($ww . '_L_ontemp_act');
+            $replace['#ww_act_raw#'] = ($wwAct === null) ? '—' : number_format($wwAct, 1, ',', ' ');
+
+            // L'anneau se remplit entre les deux seuils configurés, pas de 0 à 100 :
+            // c'est la plage qui a un sens pour l'utilisateur.
+            $wwMin = $this->widgetNumber($ww . '_temp_min_set');
+            $wwMax = $this->widgetNumber($ww . '_temp_max_set');
+            $ratio = 0;
+            if ($wwAct !== null && $wwMin !== null && $wwMax !== null && $wwMax > $wwMin) {
+                $ratio = max(0, min(1, ($wwAct - $wwMin) / ($wwMax - $wwMin)));
+            }
+            $replace['#ww_offset#'] = round(301.6 * (1 - $ratio), 1);
+
+            // --- Silo --------------------------------------------------------
+            $pct = $this->widgetNumber('pellet_stock_pct');
+            $pct = ($pct === null) ? 0 : max(0, min(100, $pct));
+            $replace['#silo_pct#'] = intval(round($pct));
+            $kg = $this->widgetNumber('pellet_stock_kg');
+            $replace['#silo_kg#'] = ($kg === null) ? '—' : number_format($kg, 0, ',', ' ');
+            $days = $this->widgetNumber('pellet_autonomy_days');
+            $replace['#silo_days#'] = ($days === null)
+                ? __('indéterminée', __FILE__)
+                : '~ ' . intval(round($days)) . __(' jours', __FILE__);
+            // La zone remplissable du dessin va de y=22 à y=100, soit 78 unités.
+            $height = round(78 * ($pct / 100), 1);
+            $replace['#silo_h#'] = $height;
+            $replace['#silo_y#'] = round(100 - $height, 1);
+
+            // --- Défauts -----------------------------------------------------
+            if ($faultActive) {
+                $replace['#fault_color#'] = '#E8543C';
+                $replace['#fault_path#'] = 'M60 34v34M60 82v4';
+                $replace['#fault_title#'] = __('Défaut en cours', __FILE__);
+                $replace['#fault_text#'] = $this->widgetValue('error_text', __('Consultez la chaudière', __FILE__));
+            } else {
+                $replace['#fault_color#'] = '#8CC63F';
+                $replace['#fault_path#'] = 'M40 61l14 15 27-30';
+                $replace['#fault_title#'] = __('Aucun défaut', __FILE__);
+                $replace['#fault_text#'] = __('Tout fonctionne correctement', __FILE__);
+            }
+
+            // --- Pied --------------------------------------------------------
+            $replace['#conn_text#'] = $connected ? __('OK', __FILE__) : __('perdue', __FILE__);
+            $replace['#api_host#'] = $this->getConfiguration('ip', '—') . ':' . $this->getConfiguration('port', 4321);
+            $lastPoll = intval($this->getCache('lastPoll', 0));
+            $replace['#updated#'] = ($lastPoll > 0) ? date('H:i:s', $lastPoll) : '—';
+            $replace['#stock_source#'] = ($this->getConfiguration('stockSource', 'plugin') === 'boiler')
+                ? __('compteur chaudière', __FILE__)
+                : __('comptabilité du plugin', __FILE__);
+            $replace['#now_time#'] = date('H:i');
+            $replace['#now_date#'] = date('d/m/Y');
+
+            return $this->postToHtml($_version, template_replace($replace, getTemplate('core', 'dashboard', 'okofen', 'okofen')));
+        } catch (Throwable $e) {
+            // Throwable et non Exception : c'est précisément une Error PHP 7+ — un appel
+            // à une méthode inexistante — qui avait produit un HTTP 500 en 1.0.5.
+            log::add('okofen', 'error', 'Rendu du widget impossible, retour au widget standard : ' . $e->getMessage());
+            return parent::toHtml($_version);
+        }
+    }
 }
 
 class okofenCmd extends cmd {

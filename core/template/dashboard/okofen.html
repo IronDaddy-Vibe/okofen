@@ -1,0 +1,212 @@
+<div class="eqLogic okofen-widget" data-eqlogic_id="#id#" style="#style#">
+<style>
+.okofen-widget {
+  --ok-bg: #0B0F0C;
+  --ok-panel: #121A14;
+  --ok-panel-head: #17211A;
+  --ok-line: #22301F;
+  --ok-ink: #E7F0E7;
+  --ok-muted: #8FA391;
+  --ok-green: #8CC63F;
+  --ok-green-soft: #A6D95F;
+  --ok-blue: #3FA3DB;
+  --ok-red: #E8543C;
+  --ok-orange: #F0A030;
+  --ok-pellet: #C89A5B;
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+  border-radius: 10px;
+  padding: 14px;
+  display: block;
+  box-sizing: border-box;
+}
+.okofen-widget * { box-sizing: border-box; }
+
+.okofen-widget .ok-head {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+  padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--ok-line);
+}
+.okofen-widget .ok-brand { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em; }
+.okofen-widget .ok-brand span { color: var(--ok-green); }
+.okofen-widget .ok-status { display: flex; align-items: center; gap: 7px; font-size: 0.82rem; color: var(--ok-muted); }
+.okofen-widget .ok-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok-green); flex: none; }
+.okofen-widget .ok-dot.warn { background: var(--ok-orange); }
+.okofen-widget .ok-dot.bad  { background: var(--ok-red); }
+.okofen-widget .ok-clock { margin-left: auto; text-align: right; font-size: 0.78rem; color: var(--ok-muted); line-height: 1.35; }
+
+.okofen-widget .ok-grid {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+}
+.okofen-widget .ok-panel {
+  background: var(--ok-panel); border: 1px solid var(--ok-line); border-radius: 8px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.okofen-widget .ok-panel h4 {
+  margin: 0; padding: 8px 12px; background: var(--ok-panel-head);
+  border-bottom: 1px solid var(--ok-line);
+  font-size: 0.7rem; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--ok-muted); font-weight: 600; text-align: center;
+}
+.okofen-widget .ok-rows { padding: 4px 12px 8px; }
+.okofen-widget .ok-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0; border-bottom: 1px solid var(--ok-line);
+  font-size: 0.82rem;
+}
+.okofen-widget .ok-row:last-child { border-bottom: none; }
+.okofen-widget .ok-row .lbl { color: var(--ok-ink); opacity: 0.88; }
+.okofen-widget .ok-row .val { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.okofen-widget .ok-ico { width: 17px; text-align: center; flex: none; font-size: 0.95rem; }
+.okofen-widget .v-red    { color: var(--ok-red); }
+.okofen-widget .v-blue   { color: var(--ok-blue); }
+.okofen-widget .v-green  { color: var(--ok-green); }
+.okofen-widget .v-orange { color: var(--ok-orange); }
+.okofen-widget .v-mute   { color: var(--ok-muted); }
+
+.okofen-widget .ok-center {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 8px; padding: 14px 12px 16px; text-align: center;
+}
+.okofen-widget .ok-caption { font-size: 0.78rem; color: var(--ok-muted); }
+.okofen-widget .ok-caption strong { display: block; font-size: 0.92rem; margin-bottom: 2px; }
+
+.okofen-widget .ok-split { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.okofen-widget .ok-split > .ok-rows { flex: 1 1 130px; padding-bottom: 4px; }
+
+.okofen-widget .ok-silo { display: flex; align-items: center; gap: 14px; padding: 12px; }
+.okofen-widget .ok-silo-figures { flex: 1; display: flex; flex-direction: column; gap: 8px; text-align: center; }
+.okofen-widget .ok-big { font-size: 1.7rem; font-weight: 700; line-height: 1; color: var(--ok-green); }
+.okofen-widget .ok-big small { font-size: 0.9rem; }
+.okofen-widget .ok-sep { border-top: 1px solid var(--ok-line); padding-top: 8px; }
+
+.okofen-widget .ok-foot {
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--ok-line);
+  display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 0.74rem; color: var(--ok-muted);
+}
+.okofen-widget .ok-foot b { font-weight: 600; color: var(--ok-ink); opacity: 0.85; }
+</style>
+
+  <div class="ok-head">
+    <div class="ok-brand">ÖKO<span>FEN</span> · #name#</div>
+    <div class="ok-status"><span class="ok-dot #state_dot#"></span>#state_text#</div>
+    <div class="ok-clock">#now_time#<br>#now_date#</div>
+  </div>
+
+  <div class="ok-grid">
+
+    <div class="ok-panel">
+      <h4>État chaudière</h4>
+      <div class="ok-center">
+        <svg viewBox="0 0 120 120" width="112" height="112" role="img" aria-label="État de la chaudière">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="#22301F" stroke-width="9"></circle>
+          <circle cx="60" cy="60" r="52" fill="none" stroke="#state_color#" stroke-width="9"
+                  stroke-linecap="round" stroke-dasharray="326.7"
+                  stroke-dashoffset="#state_offset#" transform="rotate(-90 60 60)"></circle>
+          <path d="M60 34c7 9 12 14 12 22a12 12 0 0 1-24 0c0-5 3-8 6-12 1 4 3 6 5 7 2-6 1-12 1-17z"
+                fill="#state_color#"></path>
+          <text x="60" y="86" text-anchor="middle" font-size="21" font-weight="700"
+                fill="#state_color#" font-family="Segoe UI, Arial, sans-serif">#state_code#</text>
+        </svg>
+        <div class="ok-caption"><strong style="color:#state_color#">#state_text#</strong>Modulation #modulation# %</div>
+      </div>
+    </div>
+
+    <div class="ok-panel">
+      <h4>Chaudière</h4>
+      <div class="ok-rows">
+        <div class="ok-row"><span class="ok-ico">🌡️</span><span class="lbl">Température</span><span class="val v-red">#temp_act#</span></div>
+        <div class="ok-row"><span class="ok-ico">🎯</span><span class="lbl">Consigne</span><span class="val v-blue">#temp_set#</span></div>
+        <div class="ok-row"><span class="ok-ico">📊</span><span class="lbl">Modulation</span><span class="val v-green">#modulation# %</span></div>
+        <div class="ok-row"><span class="ok-ico">⏱️</span><span class="lbl">Compteur brûleur</span><span class="val v-mute">#runtime# h</span></div>
+      </div>
+    </div>
+
+    <div class="ok-panel">
+      <h4>Circuit chauffage</h4>
+      <div class="ok-rows">
+        <div class="ok-row"><span class="ok-ico">🏠</span><span class="lbl">Confort</span><span class="val v-red">#hk_comfort#</span></div>
+        <div class="ok-row"><span class="ok-ico">🌙</span><span class="lbl">Réduit</span><span class="val v-blue">#hk_setback#</span></div>
+        <div class="ok-row"><span class="ok-ico">🌡️</span><span class="lbl">Départ</span><span class="val v-green">#hk_flow#</span></div>
+        <div class="ok-row"><span class="ok-ico">🔄</span><span class="lbl">Pompe</span><span class="val #hk_pump_class#">#hk_pump#</span></div>
+      </div>
+    </div>
+
+    <div class="ok-panel">
+      <h4>Eau chaude sanitaire</h4>
+      <div class="ok-split">
+        <div class="ok-rows">
+          <div class="ok-row"><span class="ok-ico">⚙️</span><span class="lbl">Mode</span><span class="val v-mute">#ww_mode#</span></div>
+          <div class="ok-row"><span class="ok-ico">🎯</span><span class="lbl">Consigne</span><span class="val v-blue">#ww_set#</span></div>
+          <div class="ok-row"><span class="ok-ico">🔥</span><span class="lbl">Minimum</span><span class="val v-orange">#ww_min#</span></div>
+        </div>
+        <svg viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="Température ECS">
+          <circle cx="60" cy="60" r="48" fill="none" stroke="#22301F" stroke-width="10"></circle>
+          <circle cx="60" cy="60" r="48" fill="none" stroke="#3FA3DB" stroke-width="10"
+                  stroke-linecap="round" stroke-dasharray="301.6"
+                  stroke-dashoffset="#ww_offset#" transform="rotate(-90 60 60)"></circle>
+          <text x="60" y="58" text-anchor="middle" font-size="20" font-weight="700"
+                fill="#E7F0E7" font-family="Segoe UI, Arial, sans-serif">#ww_act_raw#</text>
+          <text x="60" y="76" text-anchor="middle" font-size="10"
+                fill="#8FA391" font-family="Segoe UI, Arial, sans-serif">°C actuelle</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="ok-panel">
+      <h4>Silo à pellets</h4>
+      <div class="ok-silo">
+        <svg viewBox="0 0 70 110" width="66" height="104" role="img" aria-label="Niveau du silo">
+          <defs>
+            <clipPath id="okSilo#id#">
+              <path d="M10 22h50v58L35 100 10 80z"></path>
+            </clipPath>
+          </defs>
+          <rect x="14" y="10" width="42" height="9" rx="3" fill="#3A4A38"></rect>
+          <path d="M10 22h50v58L35 100 10 80z" fill="#0B0F0C" stroke="#3A4A38" stroke-width="2"></path>
+          <g clip-path="url(#okSilo#id#)">
+            <rect x="10" y="#silo_y#" width="50" height="#silo_h#" fill="#C89A5B"></rect>
+            <rect x="10" y="#silo_y#" width="50" height="3" fill="#DDB47A"></rect>
+          </g>
+          <path d="M10 22h50v58L35 100 10 80z" fill="none" stroke="#8CC63F" stroke-width="2"></path>
+        </svg>
+        <div class="ok-silo-figures">
+          <div>
+            <div class="ok-big">#silo_pct# <small>%</small></div>
+            <div class="ok-caption">Niveau de remplissage</div>
+          </div>
+          <div class="ok-sep">
+            <div class="ok-big" style="font-size:1.25rem;">#silo_kg# <small>kg</small></div>
+            <div class="ok-caption">Pellets restants</div>
+          </div>
+          <div class="ok-sep">
+            <div class="ok-big" style="font-size:1.25rem;">#silo_days#</div>
+            <div class="ok-caption">Autonomie estimée</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ok-panel">
+      <h4>Défauts</h4>
+      <div class="ok-center">
+        <svg viewBox="0 0 120 120" width="96" height="96" role="img" aria-label="État des défauts">
+          <circle cx="60" cy="60" r="50" fill="none" stroke="#fault_color#" stroke-width="8"></circle>
+          <path d="#fault_path#" fill="none" stroke="#fault_color#" stroke-width="9"
+                stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <div class="ok-caption"><strong style="color:#fault_color#">#fault_title#</strong>#fault_text#</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="ok-foot">
+    <span><b>Connexion</b> #conn_text#</span>
+    <span><b>API JSON</b> #api_host#</span>
+    <span><b>Dernière relève</b> #updated#</span>
+    <span><b>Stock</b> #stock_source#</span>
+  </div>
+
+</div>

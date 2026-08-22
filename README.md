@@ -17,6 +17,8 @@ Testé sur une **Pellematic SMART XS** avec Jeedom 4.6.
 - **Suivi du stock de pellets** avec estimation de consommation et calcul d'autonomie.
 - **Suivi de maintenance** : historique des remplissages de silo et des vidanges du
   cendrier, alertes issues de l'état de la chaudière.
+- **Widget de tableau de bord dédié** : état de la chaudière, températures, circuit de
+  chauffage, ECS, niveau du silo et défauts sur une seule tuile.
 - **Deux modes d'affichage** : *Basique* pour l'usage quotidien (températures, état,
   modes chauffage et ECS, stock, alertes), *Expert* pour l'intégralité des variables.
   Le mode ne fait que masquer : toutes les commandes restent créées, alimentées et

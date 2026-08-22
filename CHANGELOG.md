@@ -1,5 +1,29 @@
 # Journal des versions
 
+## 1.3.0 — 22/08/2026
+
+### Widget de tableau de bord
+
+Widget complet remplaçant l'affichage standard, inspiré d'une maquette de tableau de
+bord ÖkoFEN : six panneaux sur une grille adaptative — état de la chaudière, chaudière,
+circuit de chauffage, ECS, silo à pellets, défauts — plus un pied de page portant la
+connexion, l'hôte JSON, l'heure de la dernière relève et la source du stock.
+
+Choix de conception :
+
+- **Les jauges portent une information, elles ne décorent pas.** L'anneau d'état se
+  remplit à la modulation réelle ; l'anneau ECS se remplit entre les deux seuils
+  configurés, et non de 0 à 100 °C — c'est la plage qui a un sens pour l'utilisateur.
+- **Les couleurs encodent l'état** : vert en fonctionnement, orange sur une demande de
+  maintenance (états 8 cendres et 9 pellets), rouge sur défaut, gris si la chaudière
+  est injoignable.
+- **Aucun composant n'est codé en dur.** Le widget cherche le premier circuit et le
+  premier ballon présents (`hk1..6`, `ww1..3`), conformément au principe de découverte
+  automatique. Une donnée absente s'affiche en tiret cadratin plutôt que de casser.
+- **Repli systématique.** Toute erreur de rendu est interceptée — `Throwable`, donc
+  les `Error` PHP 7+ comprises — et rend le widget standard de Jeedom. Un tableau de
+  bord cassé serait un prix disproportionné pour un affichage d'agrément.
+
 ## 1.2.0 — 21/08/2026
 
 Version issue d'une comparaison avec le plugin MyOkoTouch, qui a révélé la vraie
