@@ -85,6 +85,19 @@ try {
     }
 
     /* ---------------------------------------------------------------- */
+    /* Graphique d'historique, rendu en SVG côté serveur. */
+    if (init('action') == 'historyChart') {
+        $cmd = cmd::byId(init('id'));
+        if (!is_object($cmd) || $cmd->getEqType() != 'okofen') {
+            throw new Exception(__('Commande ÖkoFEN introuvable : ', __FILE__) . init('id'));
+        }
+        if ($cmd->getIsHistorized() != 1) {
+            throw new Exception(__('Cette commande n\'est pas historisée : aucun graphique ne peut être tracé. Activez l\'historisation dans sa configuration.', __FILE__));
+        }
+        ajax::success(okofen::renderHistoryChart($cmd, init('hours', 24)));
+    }
+
+    /* ---------------------------------------------------------------- */
     if (init('action') == 'syncCommands') {
         $eqLogic = eqLogic::byId(init('id'));
         if (!is_object($eqLogic) || $eqLogic->getEqType_name() != 'okofen') {

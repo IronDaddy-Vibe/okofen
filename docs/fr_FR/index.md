@@ -135,6 +135,21 @@ ne bougerait presque jamais.
 Les couleurs encodent l'état : vert en fonctionnement, **orange sur une demande de
 maintenance** (cendres ou pellets), rouge sur défaut, gris si la chaudière est injoignable.
 
+### Graphiques d'historique
+
+Cliquer sur une valeur soulignée en pointillés ouvre son **évolution dans le temps** :
+
+- la jauge d'eau chaude sanitaire,
+- la température de chaudière,
+- la température de départ du chauffage,
+- le stock de pellets.
+
+La fenêtre propose quatre périodes — 6 h, 24 h, 7 jours, 30 jours — et un résumé
+minimum / moyenne / maximum. Cliquer en dehors, ou sur *Fermer*, referme la fenêtre.
+
+> Seules les valeurs **historisées** sont cliquables. Si un graphique reste vide, c'est
+> que l'historique n'a pas encore assez de mesures : il se remplit à chaque relève.
+
 > Le widget **remplace la tuile standard**, donc les champs de saisie habituels de Jeedom
 > n'y figurent plus. Utilisez ses propres boutons.
 

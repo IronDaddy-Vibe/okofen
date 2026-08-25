@@ -122,6 +122,52 @@
 .okofen-widget .ok-foot .ok-btns {
   margin-left: auto; padding: 0; border-top: none; flex: 0 0 auto;
 }
+
+/* --- éléments ouvrant un historique ------------------------------------- */
+.okofen-widget .ok-chartable { cursor: pointer; }
+.okofen-widget .ok-chartable:hover { filter: brightness(1.25); }
+.okofen-widget span.ok-chartable.val { text-decoration: underline dotted; text-underline-offset: 3px; }
+.okofen-widget .ok-gauge { display: inline-flex; }
+
+/* --- fenêtre de graphique ------------------------------------------------ */
+/* Ces règles visent un élément ajouté au <body>, hors du widget : les
+   sélecteurs ne sont donc volontairement pas préfixés par .okofen-widget. */
+.okofen-modal {
+  position: fixed; inset: 0; z-index: 10000;
+  background: rgba(4, 8, 5, 0.78);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.okofen-modal-box {
+  background: #121A14; border: 1px solid #2C3D28; border-radius: 10px;
+  padding: 18px; width: 100%; max-width: 780px;
+  max-height: 90vh; overflow-y: auto;
+  color: #E7F0E7; font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+}
+.okofen-chart-head {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid #22301F;
+}
+.okofen-chart-head b { font-size: 1rem; }
+.okofen-chart-head span { font-size: 0.78rem; color: #8FA391; margin-left: auto; }
+.okofen-chart-svg { width: 100%; height: auto; display: block; }
+.okofen-chart-empty { color: #8FA391; font-size: 0.85rem; line-height: 1.55; margin: 18px 0; }
+.okofen-chart-foot {
+  display: flex; flex-wrap: wrap; gap: 8px 26px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid #22301F;
+  font-size: 0.78rem; color: #8FA391; font-variant-numeric: tabular-nums;
+}
+.okofen-chart-foot b { color: #E7F0E7; font-weight: 600; margin-right: 4px; }
+.okofen-chart-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.okofen-chart-btn {
+  font: inherit; font-size: 0.74rem; font-weight: 600;
+  color: #8FA391; background: #0E140F; border: 1px solid #22301F;
+  border-radius: 5px; padding: 5px 12px; cursor: pointer;
+}
+.okofen-chart-btn:hover { color: #E7F0E7; border-color: #3C5236; }
+.okofen-chart-btn.active { color: #0B0F0C; background: #8CC63F; border-color: #8CC63F; }
+.okofen-chart-btn.close { margin-left: auto; }
 </style>
 
   <div class="ok-head">
@@ -153,7 +199,7 @@
     <div class="ok-panel">
       <h4>Chaudière</h4>
       <div class="ok-rows">
-        <div class="ok-row"><span class="ok-ico">🌡️</span><span class="lbl">Température</span><span class="val v-red">#temp_act#</span></div>
+        <div class="ok-row"><span class="ok-ico">🌡️</span><span class="lbl">Température</span>#temp_act_val#</div>
         <div class="ok-row"><span class="ok-ico">🎯</span><span class="lbl">Consigne</span><span class="val v-blue">#temp_set#</span></div>
         <div class="ok-row"><span class="ok-ico">📊</span><span class="lbl">Modulation</span><span class="val v-green">#modulation# %</span></div>
         <div class="ok-row"><span class="ok-ico">⏱️</span><span class="lbl">Compteur brûleur</span><span class="val v-mute">#runtime# h</span></div>
@@ -165,7 +211,7 @@
       <div class="ok-rows">
         <div class="ok-row"><span class="ok-ico">🏠</span><span class="lbl">Confort</span>#hk_comfort_ctl#</div>
         <div class="ok-row"><span class="ok-ico">🌙</span><span class="lbl">Réduit</span>#hk_setback_ctl#</div>
-        <div class="ok-row"><span class="ok-ico">🌡️</span><span class="lbl">Départ</span><span class="val v-green">#hk_flow#</span></div>
+        <div class="ok-row"><span class="ok-ico">🌡️</span><span class="lbl">Départ</span>#hk_flow_val#</div>
         <div class="ok-row"><span class="ok-ico">🔄</span><span class="lbl">Pompe</span><span class="val #hk_pump_class#">#hk_pump#</span></div>
       </div>
       #hk_mode_buttons#
@@ -179,16 +225,20 @@
           <div class="ok-row"><span class="ok-ico">🔥</span><span class="lbl">Minimum</span>#ww_min_ctl#</div>
           <div class="ok-row"><span class="ok-ico">📈</span><span class="lbl">État</span><span class="val v-mute">#ww_state#</span></div>
         </div>
-        <svg viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="Température ECS">
-          <circle cx="60" cy="60" r="48" fill="none" stroke="#22301F" stroke-width="10"></circle>
-          <circle cx="60" cy="60" r="48" fill="none" stroke="#3FA3DB" stroke-width="10"
-                  stroke-linecap="round" stroke-dasharray="301.6"
-                  stroke-dashoffset="#ww_offset#" transform="rotate(-90 60 60)"></circle>
-          <text x="60" y="58" text-anchor="middle" font-size="20" font-weight="700"
-                fill="#E7F0E7" font-family="Segoe UI, Arial, sans-serif">#ww_act_raw#</text>
-          <text x="60" y="76" text-anchor="middle" font-size="10"
-                fill="#8FA391" font-family="Segoe UI, Arial, sans-serif">°C actuelle</text>
-        </svg>
+        <span class="ok-gauge ok-chartable" title="Voir l'évolution" onclick="#ww_chart_click#">
+          <svg viewBox="0 0 120 120" width="104" height="104" role="img" aria-label="Température ECS">
+            <circle cx="60" cy="60" r="48" fill="none" stroke="#22301F" stroke-width="10"></circle>
+            <circle cx="60" cy="60" r="48" fill="none" stroke="#3FA3DB" stroke-width="10"
+                    stroke-linecap="round" stroke-dasharray="301.6"
+                    stroke-dashoffset="#ww_offset#" transform="rotate(-90 60 60)"></circle>
+            <text x="60" y="54" text-anchor="middle" font-size="20" font-weight="700"
+                  fill="#E7F0E7" font-family="Segoe UI, Arial, sans-serif">#ww_act_raw#</text>
+            <text x="60" y="70" text-anchor="middle" font-size="10"
+                  fill="#8FA391" font-family="Segoe UI, Arial, sans-serif">°C actuelle</text>
+            <text x="60" y="86" text-anchor="middle" font-size="9"
+                  fill="#3FA3DB" font-family="Segoe UI, Arial, sans-serif">historique</text>
+          </svg>
+        </span>
       </div>
       #ww_mode_buttons#
     </div>
@@ -215,7 +265,7 @@
             <div class="ok-big">#silo_pct# <small>%</small></div>
             <div class="ok-caption">Niveau de remplissage</div>
           </div>
-          <div class="ok-sep">
+          <div class="ok-sep ok-chartable" title="Voir l'évolution" onclick="#silo_kg_click#">
             <div class="ok-big" style="font-size:1.25rem;">#silo_kg# <small>kg</small></div>
             <div class="ok-caption">Pellets restants</div>
           </div>

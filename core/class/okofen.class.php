@@ -1120,6 +1120,182 @@ class okofen extends eqLogic {
     }
 
     /* ------------------------------------------------------------------ */
+    /* Graphique d'historique                                              */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Construit le graphique d'historique d'une commande, en SVG.
+     *
+     * Le rendu se fait en PHP et non en JavaScript : le graphique arrive prêt à
+     * afficher, et le code injecté dans la page se limite à quelques lignes. C'est
+     * aussi le seul terrain vérifiable depuis le poste de développement.
+     */
+    public static function renderHistoryChart($_cmd, $_hours = 24) {
+        $hours = max(1, min(24 * 90, intval($_hours)));
+        $start = date('Y-m-d H:i:s', strtotime('-' . $hours . ' hour'));
+        $end = date('Y-m-d H:i:s');
+
+        $series = array();
+        foreach (history::getHistory($_cmd->getId(), $start, $end) as $point) {
+            $value = is_object($point) ? $point->getValue() : (isset($point['value']) ? $point['value'] : null);
+            $date = is_object($point) ? $point->getDatetime() : (isset($point['datetime']) ? $point['datetime'] : null);
+            if ($value === null || $date === null || !is_numeric($value)) {
+                continue;
+            }
+            $timestamp = strtotime($date);
+            if ($timestamp === false) {
+                continue;
+            }
+            $series[] = array($timestamp, floatval($value));
+        }
+
+        $unit = trim((string) $_cmd->getUnite());
+        $title = htmlspecialchars($_cmd->getName());
+        $periods = self::renderChartPeriods($_cmd->getId(), $hours);
+
+        if (count($series) < 2) {
+            return '<div class="okofen-chart"><div class="okofen-chart-head"><b>' . $title . '</b>'
+                . '<span>' . self::periodLabel($hours) . '</span></div>'
+                . '<p class="okofen-chart-empty">' . __('Pas encore assez de mesures enregistrées sur cette période. L\'historique se remplit à chaque relève, à condition que la commande soit historisée.', __FILE__) . '</p>'
+                . $periods . '</div>';
+        }
+
+        // --- Échelles ----------------------------------------------------
+        $w = 720; $h = 300;
+        $left = 58; $right = 702; $top = 28; $bottom = 246;
+
+        $minV = $maxV = $series[0][1];
+        $sum = 0;
+        foreach ($series as $point) {
+            $minV = min($minV, $point[1]);
+            $maxV = max($maxV, $point[1]);
+            $sum += $point[1];
+        }
+        $avg = $sum / count($series);
+        // Valeurs réelles conservées avant la marge d'affichage : le résumé doit citer
+        // ce qui a été mesuré, pas les bornes du dessin.
+        $trueMin = $minV;
+        $trueMax = $maxV;
+        // Une série parfaitement plate donnerait une division par zéro : on lui donne
+        // une amplitude arbitraire pour que la courbe reste centrée et lisible.
+        $span = ($maxV - $minV);
+        if ($span < 0.001) {
+            $minV -= 1; $maxV += 1; $span = 2;
+        } else {
+            $pad = $span * 0.12;
+            $minV -= $pad; $maxV += $pad; $span = $maxV - $minV;
+        }
+
+        $tMin = $series[0][0];
+        $tMax = $series[count($series) - 1][0];
+        $tSpan = max(1, $tMax - $tMin);
+
+        $x = function ($_t) use ($left, $right, $tMin, $tSpan) {
+            return round($left + (($_t - $tMin) / $tSpan) * ($right - $left), 1);
+        };
+        $y = function ($_v) use ($top, $bottom, $minV, $span) {
+            return round($bottom - (($_v - $minV) / $span) * ($bottom - $top), 1);
+        };
+
+        // --- Grille et étiquettes de valeur -------------------------------
+        $grid = '';
+        for ($i = 0; $i <= 4; $i++) {
+            $value = $minV + ($span * $i / 4);
+            $py = $y($value);
+            $grid .= '<line x1="' . $left . '" y1="' . $py . '" x2="' . $right . '" y2="' . $py . '" stroke="#22301F" stroke-width="1"/>';
+            $grid .= '<text x="' . ($left - 8) . '" y="' . ($py + 4) . '" text-anchor="end" font-size="11" fill="#8FA391">'
+                . number_format($value, 1, ',', ' ') . '</text>';
+        }
+
+        // --- Courbe et aire ------------------------------------------------
+        $line = '';
+        foreach ($series as $index => $point) {
+            $line .= ($index === 0 ? 'M' : 'L') . $x($point[0]) . ' ' . $y($point[1]);
+        }
+        $area = $line . 'L' . $x($tMax) . ' ' . $bottom . 'L' . $x($tMin) . ' ' . $bottom . 'Z';
+
+        $color = self::chartColor($unit);
+        $lastX = $x($tMax);
+        $lastY = $y($series[count($series) - 1][1]);
+
+        // --- Étiquettes de temps -------------------------------------------
+        $format = ($hours <= 24) ? 'H:i' : 'd/m H\hi';
+        $times = '';
+        foreach (array(0, 0.5, 1) as $fraction) {
+            $t = $tMin + ($tSpan * $fraction);
+            $px = $x($t);
+            $anchor = ($fraction == 0) ? 'start' : (($fraction == 1) ? 'end' : 'middle');
+            $times .= '<text x="' . $px . '" y="' . ($bottom + 20) . '" text-anchor="' . $anchor
+                . '" font-size="11" fill="#8FA391">' . date($format, $t) . '</text>';
+        }
+
+        $svg = '<svg viewBox="0 0 ' . $w . ' ' . $h . '" class="okofen-chart-svg" role="img" aria-label="'
+            . __('Évolution de ', __FILE__) . $title . '">'
+            . '<defs><linearGradient id="okFill' . intval($_cmd->getId()) . '" x1="0" y1="0" x2="0" y2="1">'
+            . '<stop offset="0%" stop-color="' . $color . '" stop-opacity="0.28"/>'
+            . '<stop offset="100%" stop-color="' . $color . '" stop-opacity="0"/>'
+            . '</linearGradient></defs>'
+            . $grid
+            . '<path d="' . $area . '" fill="url(#okFill' . intval($_cmd->getId()) . ')"/>'
+            . '<path d="' . $line . '" fill="none" stroke="' . $color . '" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>'
+            . '<circle cx="' . $lastX . '" cy="' . $lastY . '" r="4" fill="' . $color . '"/>'
+            . $times
+            . '</svg>';
+
+        $summary = '<div class="okofen-chart-foot">'
+            . '<span><b>' . __('Min', __FILE__) . '</b> ' . self::formatChartValue($trueMin, $unit) . '</span>'
+            . '<span><b>' . __('Moyenne', __FILE__) . '</b> ' . self::formatChartValue($avg, $unit) . '</span>'
+            . '<span><b>' . __('Max', __FILE__) . '</b> ' . self::formatChartValue($trueMax, $unit) . '</span>'
+            . '<span><b>' . __('Mesures', __FILE__) . '</b> ' . count($series) . '</span>'
+            . '</div>';
+
+        return '<div class="okofen-chart">'
+            . '<div class="okofen-chart-head"><b>' . $title . '</b><span>' . self::periodLabel($hours) . '</span></div>'
+            . $svg . $summary . $periods . '</div>';
+    }
+
+    /** Libellé d'une durée, en heures ou en jours selon ce qui se lit le mieux. */
+    private static function periodLabel($_hours) {
+        if ($_hours < 48) {
+            return $_hours . __(' dernières heures', __FILE__);
+        }
+        return round($_hours / 24) . __(' derniers jours', __FILE__);
+    }
+
+    private static function formatChartValue($_value, $_unit) {
+        return number_format($_value, 1, ',', ' ') . ($_unit === '' ? '' : ' ' . $_unit);
+    }
+
+    /** La couleur suit la nature de la grandeur, pas la commande. */
+    private static function chartColor($_unit) {
+        if ($_unit === 'kg' || $_unit === '%') {
+            return '#8CC63F';
+        }
+        if ($_unit === 'h' || $_unit === 'j') {
+            return '#F0A030';
+        }
+        return '#3FA3DB';
+    }
+
+    /** Boutons de changement de période, qui rechargent le contenu de la fenêtre. */
+    private static function renderChartPeriods($_cmdId, $_current) {
+        $buttons = '';
+        foreach (array(6 => '6 h', 24 => '24 h', 168 => '7 j', 720 => '30 j') as $hours => $label) {
+            $active = ($hours === intval($_current)) ? ' active' : '';
+            $buttons .= '<button type="button" class="okofen-chart-btn' . $active . '"'
+                . ' onclick="event.stopPropagation();$.ajax({type:\'POST\','
+                . 'url:\'plugins/okofen/core/ajax/okofen.ajax.php\','
+                . 'data:{action:\'historyChart\',id:' . intval($_cmdId) . ',hours:' . $hours . '},'
+                . 'dataType:\'json\','
+                . 'success:function(d){if(d.state==\'ok\'){$(\'.okofen-modal-box\').html(d.result);}else{alert(d.result);}}});">'
+                . $label . '</button>';
+        }
+        return '<div class="okofen-chart-btns">' . $buttons
+            . '<button type="button" class="okofen-chart-btn close" onclick="$(\'.okofen-modal\').remove();">'
+            . __('Fermer', __FILE__) . '</button></div>';
+    }
+
+    /* ------------------------------------------------------------------ */
     /* Widget de tableau de bord                                           */
     /* ------------------------------------------------------------------ */
 
@@ -1193,6 +1369,48 @@ class okofen extends eqLogic {
             . 'dataType:\'json\','
             . 'success:function(d){if(d.state!=\'ok\'){alert(d.result);}},'
             . 'error:function(r){alert(\'ÖkoFEN : \'+r.statusText);}});';
+    }
+
+    /**
+     * Gestionnaire d'ouverture du graphique d'historique.
+     *
+     * La fenêtre est construite en jQuery sans chaîne HTML, pour n'employer que des
+     * apostrophes : le code vit dans un attribut « onclick » délimité par des
+     * guillemets, un guillemet à l'intérieur casserait l'attribut.
+     *
+     * Renvoie une chaîne vide si la commande n'est pas historisable — l'élément reste
+     * alors affiché, simplement non cliquable.
+     */
+    private function widgetChartCall($_logicalId) {
+        $cmd = $this->getCmd(null, $_logicalId);
+        if (!is_object($cmd) || $cmd->getIsHistorized() != 1) {
+            return '';
+        }
+        return '$.ajax({type:\'POST\',url:\'plugins/okofen/core/ajax/okofen.ajax.php\','
+            . 'data:{action:\'historyChart\',id:' . intval($cmd->getId()) . ',hours:24},'
+            . 'dataType:\'json\','
+            . 'success:function(d){'
+            . 'if(d.state!=\'ok\'){alert(d.result);return;}'
+            . 'var b=$(\'<div>\').addClass(\'okofen-modal-box\').html(d.result);'
+            . 'var o=$(\'<div>\').addClass(\'okofen-modal\').append(b);'
+            . 'o.on(\'click\',function(e){if(e.target===o[0]){o.remove();}});'
+            . '$(\'body\').append(o);'
+            . '},'
+            . 'error:function(r){alert(\'ÖkoFEN : \'+r.statusText);}});';
+    }
+
+    /**
+     * Valeur affichée, rendue cliquable si son historique est disponible.
+     * Sans historisation, on renvoie la même valeur sans habillage : pas de faux
+     * affordance, pas de clic qui ne fait rien.
+     */
+    private function widgetChartValue($_logicalId, $_text, $_class) {
+        $call = $this->widgetChartCall($_logicalId);
+        if ($call === '') {
+            return '<span class="' . $_class . '">' . $_text . '</span>';
+        }
+        return '<span class="' . $_class . ' ok-chartable" title="'
+            . __('Voir l\'évolution', __FILE__) . '" onclick="' . $call . '">' . $_text . '</span>';
     }
 
     /**
@@ -1344,7 +1562,8 @@ class okofen extends eqLogic {
             $replace['#state_offset#'] = round(326.7 * (1 - ($modulation / 100)), 1);
 
             // --- Chaudière ---------------------------------------------------
-            $replace['#temp_act#'] = $this->widgetTemp('pe1_L_temp_act');
+            $replace['#temp_act_val#'] = $this->widgetChartValue(
+                'pe1_L_temp_act', $this->widgetTemp('pe1_L_temp_act'), 'val v-red');
             $replace['#temp_set#'] = $this->widgetTemp('pe1_L_temp_set');
             $runtime = $this->widgetNumber('pe1_L_runtime');
             $replace['#runtime#'] = ($runtime === null) ? '—' : number_format($runtime, 0, ',', ' ');
@@ -1353,7 +1572,8 @@ class okofen extends eqLogic {
             $replace['#hk_comfort_ctl#'] = $this->widgetStepper('set_' . $hk . '_temp_heat', $hk . '_temp_heat');
             $replace['#hk_setback_ctl#'] = $this->widgetStepper('set_' . $hk . '_temp_setback', $hk . '_temp_setback');
             $replace['#hk_mode_buttons#'] = $this->widgetModeButtons('set_' . $hk . '_mode_auto', $hk . '_mode_auto');
-            $replace['#hk_flow#'] = $this->widgetTemp($hk . '_L_flowtemp_act');
+            $replace['#hk_flow_val#'] = $this->widgetChartValue(
+                $hk . '_L_flowtemp_act', $this->widgetTemp($hk . '_L_flowtemp_act'), 'val v-green');
             $pump = $this->widgetValue($hk . '_L_pump', null);
             if ($pump === null) {
                 $replace['#hk_pump#'] = '—';
@@ -1392,6 +1612,10 @@ class okofen extends eqLogic {
                 $ratio = max(0, min(1, ($wwAct - $wwMin) / ($wwMax - $wwMin)));
             }
             $replace['#ww_offset#'] = round(301.6 * (1 - $ratio), 1);
+            // La jauge ECS ouvre l'historique de la température : c'est la valeur que
+            // l'on souhaite le plus souvent suivre dans le temps.
+            $replace['#ww_chart_click#'] = $this->widgetChartCall($ww . '_L_ontemp_act');
+            $replace['#silo_kg_click#'] = $this->widgetChartCall('pellet_stock_kg');
 
             // --- Silo --------------------------------------------------------
             $pct = $this->widgetNumber('pellet_stock_pct');

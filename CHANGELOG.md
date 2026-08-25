@@ -1,5 +1,30 @@
 # Journal des versions
 
+## 1.5.0 — 25/08/2026
+
+### Graphique d'historique au clic
+
+La jauge d'eau chaude sanitaire ouvre une fenêtre montrant l'évolution de la
+température. Le même geste fonctionne sur la température de chaudière, la température
+de départ du chauffage et le stock de pellets.
+
+La fenêtre offre quatre périodes — 6 h, 24 h, 7 jours, 30 jours — et un résumé
+minimum / moyenne / maximum accompagné du nombre de mesures.
+
+Choix de conception :
+
+- **Le graphique est produit en SVG côté PHP**, pas en JavaScript. Les APIs JavaScript
+  de Jeedom ont déjà coûté deux corrections (`jeedom.cmd.execute` et ses options) ;
+  le PHP est le seul terrain vérifiable depuis le poste de développement. Le code
+  injecté dans la page se limite à l'ouverture de la fenêtre.
+- **Seules les valeurs réellement historisées deviennent cliquables.** Sans historique,
+  l'élément s'affiche normalement mais n'est pas interactif : pas de clic qui ne fasse
+  rien.
+- Le résumé cite les **valeurs mesurées**, et non les bornes du dessin, qui incluent
+  une marge d'affichage.
+- Une série parfaitement plate — cas courant hors saison de chauffe — reçoit une
+  amplitude arbitraire au lieu de provoquer une division par zéro.
+
 ## 1.4.4 — 22/08/2026
 
 ### Documentation utilisateur remise à jour
