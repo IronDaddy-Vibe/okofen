@@ -1,5 +1,13 @@
 # Journal des versions
 
+## 1.5.2 — 25/08/2026
+
+La détection introduite en 1.5.1 a livré sa réponse : `cmd->getHistory()`. Les trois
+branches sont remplacées par cet appel direct.
+
+Un garde subsiste, et volontairement : un nom de méthode erroné est une `Error` PHP que
+le contrôle de syntaxe ne détecte pas. Mieux vaut un message explicite qu'une fatale.
+
 ## 1.5.1 — 25/08/2026
 
 ### Accès à l'historique détecté au lieu d'être supposé

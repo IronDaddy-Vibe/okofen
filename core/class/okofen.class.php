@@ -1255,30 +1255,18 @@ class okofen extends eqLogic {
     }
 
     /**
-     * Récupère l'historique d'une commande, quelle que soit l'API offerte par Jeedom.
+     * Récupère l'historique d'une commande.
      *
-     * La façon d'y accéder a varié selon les versions du cœur, et un nom de méthode
-     * erroné produit une Error PHP — donc un HTTP 500 muet, que le contrôle de syntaxe
-     * ne détecte pas. On interroge donc ce qui existe réellement plutôt que de parier
-     * sur une signature, et la voie retenue est journalisée pour pouvoir simplifier ce
-     * code une fois la bonne connue.
+     * `cmd->getHistory()` est la bonne API — vérifié sur Jeedom 4.6, après que la
+     * 1.5.0 eut parié à tort sur `history::getHistory()` et produit un HTTP 500.
+     * Le garde subsiste parce qu'un nom de méthode erroné est une Error PHP, que le
+     * contrôle de syntaxe ne détecte pas : mieux vaut un message clair qu'une fatale.
      */
     private static function fetchHistory($_cmd, $_start, $_end) {
-        if (method_exists($_cmd, 'getHistory')) {
-            log::add('okofen', 'debug', 'Historique lu via cmd->getHistory().');
-            return $_cmd->getHistory($_start, $_end);
+        if (!method_exists($_cmd, 'getHistory')) {
+            throw new Exception(__('Cette version de Jeedom n\'expose pas cmd->getHistory() : le graphique ne peut pas être tracé.', __FILE__));
         }
-        if (class_exists('history')) {
-            if (method_exists('history', 'all')) {
-                log::add('okofen', 'debug', 'Historique lu via history::all().');
-                return history::all($_cmd->getId(), $_start, $_end);
-            }
-            if (method_exists('history', 'getHistory')) {
-                log::add('okofen', 'debug', 'Historique lu via history::getHistory().');
-                return history::getHistory($_cmd->getId(), $_start, $_end);
-            }
-        }
-        throw new Exception(__('Aucune méthode d\'accès à l\'historique n\'a été trouvée dans ce Jeedom.', __FILE__));
+        return $_cmd->getHistory($_start, $_end);
     }
 
     /** Libellé d'une durée, en heures ou en jours selon ce qui se lit le mieux. */
