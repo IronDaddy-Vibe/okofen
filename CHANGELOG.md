@@ -1,5 +1,23 @@
 # Journal des versions
 
+## 1.6.0 — 25/08/2026
+
+### Historique du niveau de silo
+
+Le graphique du stock existait depuis la 1.5.0, mais restait peu exploitable pour un
+silo : il s'ouvrait sur 24 h, alors qu'un niveau de pellets évolue sur des semaines, et
+rien n'y distinguait une baisse par consommation d'une remontée par livraison.
+
+- **Les remplissages déclarés sont marqués sur la courbe** — trait vert pointillé et
+  quantité ajoutée. C'est ce qui donne au niveau sa lecture en dents de scie, et permet
+  de distinguer un remplissage d'une correction manuelle.
+- **Périodes adaptées à la grandeur observée** : 7 j, 30 j, 90 j et 1 an pour le stock,
+  au lieu de 6 h / 24 h / 7 j / 30 j pour les températures. Proposer 6 h sur un niveau
+  de silo n'aurait montré qu'une ligne plate.
+- Le silo s'ouvre d'emblée sur **30 jours**.
+- Le **pourcentage de remplissage** devient cliquable au même titre que les kilos.
+- Un compteur de remplissages apparaît sous le graphique lorsqu'il y en a.
+
 ## 1.5.2 — 25/08/2026
 
 La détection introduite en 1.5.1 a livré sa réponse : `cmd->getHistory()`. Les trois

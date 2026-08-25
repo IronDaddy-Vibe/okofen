@@ -142,10 +142,18 @@ Cliquer sur une valeur soulignée en pointillés ouvre son **évolution dans le 
 - la jauge d'eau chaude sanitaire,
 - la température de chaudière,
 - la température de départ du chauffage,
-- le stock de pellets.
+- le stock de pellets, en kilos comme en pourcentage.
 
-La fenêtre propose quatre périodes — 6 h, 24 h, 7 jours, 30 jours — et un résumé
-minimum / moyenne / maximum. Cliquer en dehors, ou sur *Fermer*, referme la fenêtre.
+La fenêtre propose quatre périodes et un résumé minimum / moyenne / maximum. Cliquer en
+dehors, ou sur *Fermer*, referme la fenêtre.
+
+Les périodes suivent la grandeur observée : **6 h / 24 h / 7 j / 30 j** pour les
+températures, **7 j / 30 j / 90 j / 1 an** pour le stock de pellets, qui évolue sur des
+semaines.
+
+**Sur le graphique du silo**, chaque remplissage déclaré est marqué d'un trait vert
+pointillé portant la quantité ajoutée. C'est ce qui donne à la courbe sa lecture en
+dents de scie, et distingue un remplissage d'une correction manuelle du stock.
 
 > Seules les valeurs **historisées** sont cliquables. Si un graphique reste vide, c'est
 > que l'historique n'a pas encore assez de mesures : il se remplit à chaque relève.

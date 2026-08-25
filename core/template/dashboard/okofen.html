@@ -159,6 +159,7 @@
   font-size: 0.78rem; color: #8FA391; font-variant-numeric: tabular-nums;
 }
 .okofen-chart-foot b { color: #E7F0E7; font-weight: 600; margin-right: 4px; }
+.okofen-chart-legend { color: #8CC63F; }
 .okofen-chart-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 .okofen-chart-btn {
   font: inherit; font-size: 0.74rem; font-weight: 600;
@@ -261,7 +262,7 @@
           <path d="M10 22h50v58L35 100 10 80z" fill="none" stroke="#8CC63F" stroke-width="2"></path>
         </svg>
         <div class="ok-silo-figures">
-          <div>
+          <div class="ok-chartable" title="Voir l'évolution" onclick="#silo_pct_click#">
             <div class="ok-big">#silo_pct# <small>%</small></div>
             <div class="ok-caption">Niveau de remplissage</div>
           </div>

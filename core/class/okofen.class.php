@@ -1131,7 +1131,9 @@ class okofen extends eqLogic {
      * aussi le seul terrain vérifiable depuis le poste de développement.
      */
     public static function renderHistoryChart($_cmd, $_hours = 24) {
-        $hours = max(1, min(24 * 90, intval($_hours)));
+        // Jusqu'à un an : un niveau de silo se lit sur une saison de chauffe entière,
+        // pas sur une journée.
+        $hours = max(1, min(24 * 366, intval($_hours)));
         $start = date('Y-m-d H:i:s', strtotime('-' . $hours . ' hour'));
         $end = date('Y-m-d H:i:s');
 
@@ -1151,7 +1153,8 @@ class okofen extends eqLogic {
 
         $unit = trim((string) $_cmd->getUnite());
         $title = htmlspecialchars($_cmd->getName());
-        $periods = self::renderChartPeriods($_cmd->getId(), $hours);
+        $isStock = (strpos($_cmd->getLogicalId(), 'pellet_stock') === 0);
+        $periods = self::renderChartPeriods($_cmd->getId(), $hours, $isStock);
 
         if (count($series) < 2) {
             return '<div class="okofen-chart"><div class="okofen-chart-head"><b>' . $title . '</b>'
@@ -1218,6 +1221,33 @@ class okofen extends eqLogic {
         $lastX = $x($tMax);
         $lastY = $y($series[count($series) - 1][1]);
 
+        // --- Repères de remplissage ----------------------------------------
+        // Sur un niveau de silo, une remontée de la courbe ne dit pas d'où elle vient.
+        // Marquer les livraisons déclarées distingue d'un coup d'œil un remplissage
+        // d'une correction manuelle, et donne à la courbe sa lecture en dents de scie.
+        $markers = '';
+        $deliveries = 0;
+        if ($isStock) {
+            $eqLogic = $_cmd->getEqLogic();
+            if (is_object($eqLogic) && method_exists($eqLogic, 'getDeliveryHistory')) {
+                foreach ($eqLogic->getDeliveryHistory() as $delivery) {
+                    if (!isset($delivery['date'])) {
+                        continue;
+                    }
+                    $ts = strtotime($delivery['date']);
+                    if ($ts === false || $ts < $tMin || $ts > $tMax) {
+                        continue;
+                    }
+                    $px = $x($ts);
+                    $markers .= '<line x1="' . $px . '" y1="' . $top . '" x2="' . $px . '" y2="' . $bottom
+                        . '" stroke="#8CC63F" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.7"/>'
+                        . '<text x="' . $px . '" y="' . ($top - 9) . '" text-anchor="middle" font-size="10" fill="#8CC63F">+'
+                        . intval($delivery['kg']) . '</text>';
+                    $deliveries++;
+                }
+            }
+        }
+
         // --- Étiquettes de temps -------------------------------------------
         $format = ($hours <= 24) ? 'H:i' : 'd/m H\hi';
         $times = '';
@@ -1236,6 +1266,7 @@ class okofen extends eqLogic {
             . '<stop offset="100%" stop-color="' . $color . '" stop-opacity="0"/>'
             . '</linearGradient></defs>'
             . $grid
+            . $markers
             . '<path d="' . $area . '" fill="url(#okFill' . intval($_cmd->getId()) . ')"/>'
             . '<path d="' . $line . '" fill="none" stroke="' . $color . '" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>'
             . '<circle cx="' . $lastX . '" cy="' . $lastY . '" r="4" fill="' . $color . '"/>'
@@ -1247,6 +1278,10 @@ class okofen extends eqLogic {
             . '<span><b>' . __('Moyenne', __FILE__) . '</b> ' . self::formatChartValue($avg, $unit) . '</span>'
             . '<span><b>' . __('Max', __FILE__) . '</b> ' . self::formatChartValue($trueMax, $unit) . '</span>'
             . '<span><b>' . __('Mesures', __FILE__) . '</b> ' . count($series) . '</span>'
+            . ($deliveries > 0
+                ? '<span class="okofen-chart-legend">' . $deliveries
+                    . __(' remplissage(s) déclaré(s), en traits verts', __FILE__) . '</span>'
+                : '')
             . '</div>';
 
         return '<div class="okofen-chart">'
@@ -1292,10 +1327,20 @@ class okofen extends eqLogic {
         return '#3FA3DB';
     }
 
-    /** Boutons de changement de période, qui rechargent le contenu de la fenêtre. */
-    private static function renderChartPeriods($_cmdId, $_current) {
+    /**
+     * Boutons de changement de période, qui rechargent le contenu de la fenêtre.
+     *
+     * Les périodes suivent la grandeur observée : une température se lit à l'heure,
+     * un niveau de silo à la saison. Proposer 6 h sur un stock de pellets n'aurait
+     * montré qu'une ligne plate.
+     */
+    private static function renderChartPeriods($_cmdId, $_current, $_isStock = false) {
+        $choices = $_isStock
+            ? array(168 => '7 j', 720 => '30 j', 2160 => '90 j', 8760 => '1 an')
+            : array(6 => '6 h', 24 => '24 h', 168 => '7 j', 720 => '30 j');
+
         $buttons = '';
-        foreach (array(6 => '6 h', 24 => '24 h', 168 => '7 j', 720 => '30 j') as $hours => $label) {
+        foreach ($choices as $hours => $label) {
             $active = ($hours === intval($_current)) ? ' active' : '';
             $buttons .= '<button type="button" class="okofen-chart-btn' . $active . '"'
                 . ' onclick="event.stopPropagation();$.ajax({type:\'POST\','
@@ -1396,13 +1441,13 @@ class okofen extends eqLogic {
      * Renvoie une chaîne vide si la commande n'est pas historisable — l'élément reste
      * alors affiché, simplement non cliquable.
      */
-    private function widgetChartCall($_logicalId) {
+    private function widgetChartCall($_logicalId, $_hours = 24) {
         $cmd = $this->getCmd(null, $_logicalId);
         if (!is_object($cmd) || $cmd->getIsHistorized() != 1) {
             return '';
         }
         return '$.ajax({type:\'POST\',url:\'plugins/okofen/core/ajax/okofen.ajax.php\','
-            . 'data:{action:\'historyChart\',id:' . intval($cmd->getId()) . ',hours:24},'
+            . 'data:{action:\'historyChart\',id:' . intval($cmd->getId()) . ',hours:' . intval($_hours) . '},'
             . 'dataType:\'json\','
             . 'success:function(d){'
             . 'if(d.state!=\'ok\'){alert(d.result);return;}'
@@ -1630,7 +1675,9 @@ class okofen extends eqLogic {
             // La jauge ECS ouvre l'historique de la température : c'est la valeur que
             // l'on souhaite le plus souvent suivre dans le temps.
             $replace['#ww_chart_click#'] = $this->widgetChartCall($ww . '_L_ontemp_act');
-            $replace['#silo_kg_click#'] = $this->widgetChartCall('pellet_stock_kg');
+            // Le silo s'ouvre d'emblée sur 30 jours : sur 24 h la courbe serait plate.
+            $replace['#silo_kg_click#'] = $this->widgetChartCall('pellet_stock_kg', 720);
+            $replace['#silo_pct_click#'] = $this->widgetChartCall('pellet_stock_pct', 720);
 
             // --- Silo --------------------------------------------------------
             $pct = $this->widgetNumber('pellet_stock_pct');
