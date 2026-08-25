@@ -1136,7 +1136,7 @@ class okofen extends eqLogic {
         $end = date('Y-m-d H:i:s');
 
         $series = array();
-        foreach (history::getHistory($_cmd->getId(), $start, $end) as $point) {
+        foreach (self::fetchHistory($_cmd, $start, $end) as $point) {
             $value = is_object($point) ? $point->getValue() : (isset($point['value']) ? $point['value'] : null);
             $date = is_object($point) ? $point->getDatetime() : (isset($point['datetime']) ? $point['datetime'] : null);
             if ($value === null || $date === null || !is_numeric($value)) {
@@ -1252,6 +1252,33 @@ class okofen extends eqLogic {
         return '<div class="okofen-chart">'
             . '<div class="okofen-chart-head"><b>' . $title . '</b><span>' . self::periodLabel($hours) . '</span></div>'
             . $svg . $summary . $periods . '</div>';
+    }
+
+    /**
+     * Récupère l'historique d'une commande, quelle que soit l'API offerte par Jeedom.
+     *
+     * La façon d'y accéder a varié selon les versions du cœur, et un nom de méthode
+     * erroné produit une Error PHP — donc un HTTP 500 muet, que le contrôle de syntaxe
+     * ne détecte pas. On interroge donc ce qui existe réellement plutôt que de parier
+     * sur une signature, et la voie retenue est journalisée pour pouvoir simplifier ce
+     * code une fois la bonne connue.
+     */
+    private static function fetchHistory($_cmd, $_start, $_end) {
+        if (method_exists($_cmd, 'getHistory')) {
+            log::add('okofen', 'debug', 'Historique lu via cmd->getHistory().');
+            return $_cmd->getHistory($_start, $_end);
+        }
+        if (class_exists('history')) {
+            if (method_exists('history', 'all')) {
+                log::add('okofen', 'debug', 'Historique lu via history::all().');
+                return history::all($_cmd->getId(), $_start, $_end);
+            }
+            if (method_exists('history', 'getHistory')) {
+                log::add('okofen', 'debug', 'Historique lu via history::getHistory().');
+                return history::getHistory($_cmd->getId(), $_start, $_end);
+            }
+        }
+        throw new Exception(__('Aucune méthode d\'accès à l\'historique n\'a été trouvée dans ce Jeedom.', __FILE__));
     }
 
     /** Libellé d'une durée, en heures ou en jours selon ce qui se lit le mieux. */

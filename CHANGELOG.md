@@ -1,5 +1,24 @@
 # Journal des versions
 
+## 1.5.1 — 25/08/2026
+
+### Accès à l'historique détecté au lieu d'être supposé
+
+La 1.5.0 appelait `history::getHistory()`, dont la signature n'avait pas pu être
+vérifiée — le graphique répondait « Internal Server Error ». Le plugin interroge
+désormais l'API réellement présente (`cmd->getHistory()`, `history::all()`, puis
+`history::getHistory()`), et journalise la voie retenue.
+
+### Une fatale ne ressort plus en 500 muet
+
+Le fichier ajax n'attrapait que les `Exception`. Une `Error` PHP 7+ — méthode
+inexistante, mauvais type d'argument — produisait donc un HTTP 500 sans rien écrire
+dans le log du plugin, exactement comme en 1.0.5.
+
+Il attrape maintenant les `Throwable` : le message remonte jusqu'à l'utilisateur **et**
+dans le log, avec fichier et ligne. Cela vaut pour toutes les actions, pas seulement
+pour le graphique.
+
 ## 1.5.0 — 25/08/2026
 
 ### Graphique d'historique au clic

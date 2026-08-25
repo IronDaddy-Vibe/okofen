@@ -144,6 +144,11 @@ try {
 
     throw new Exception(__('Aucune méthode correspondante à : ', __FILE__) . init('action'));
 
-} catch (Exception $e) {
-    ajax::error(displayException($e), $e->getCode());
+} catch (Throwable $e) {
+    // Throwable et non Exception : une Error PHP 7+ — méthode inexistante, mauvais
+    // type d'argument — ressortait en HTTP 500 muet, sans rien dans le log du plugin.
+    // Le message arrive désormais jusqu'à l'utilisateur et jusqu'au log.
+    log::add('okofen', 'error', 'Ajax « ' . init('action') . ' » : ' . $e->getMessage()
+        . ' (' . $e->getFile() . ':' . $e->getLine() . ')');
+    ajax::error($e->getMessage(), $e->getCode());
 }
